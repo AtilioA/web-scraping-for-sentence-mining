@@ -95,11 +95,12 @@ def post_to_card(targetPost):
                 print(f"Downloading {localFilename}...")
             # print(audiosFilenames)
 
+            if len(frenchSentences) != len(portugueseSentences) != len(audiosFilenames):
+                print("Lists don't have all the same length. Output may be compromised.\n")
             # Writing to .csv according to card's fields
-            print(f"{len(portugueseSentences)}, {len(frenchSentences)}, {len(audiosFilenames)}")
             cardInfos = [x for x in itertools.chain.from_iterable(itertools.zip_longest(frenchSentences, portugueseSentences, audiosFilenames)) if x]
             for i in range(0, len(cardInfos) - 2, 3):
-                card.write(f"{cardInfos[i]};{cardInfos[i + 1]};[sound:{cardInfos[i + 2]}];\n")
+                card.write(f"{cardInfos[i]}|{cardInfos[i + 1]}|[sound:{cardInfos[i + 2]}]|frances_fluente\n")
         else:
             print("Failed request.")
 
