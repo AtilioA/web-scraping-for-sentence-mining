@@ -1,4 +1,5 @@
 import re
+import sys
 import requests
 from bs4 import BeautifulSoup
 import shutil
@@ -6,6 +7,8 @@ import itertools
 
 
 def download_file(url):
+    """ Downloads url to audios folder """
+
     local_filename = url.split('/')[-1]
     with requests.get(url, stream=True) as r:
         with open(f"audios/{local_filename}", 'wb') as f:
@@ -14,48 +17,57 @@ def download_file(url):
     return local_filename
 
 
-def format_french_text(text):
+def format_french_sentence(sentence):
+    """ Cleans a french sentence. Returns the new sentence """
+
     # Removes div tags
-    text = text.replace("""<div class="post__player-title">""", '')
-    text = text.replace("</div>", '').strip()
+    sentence = sentence.replace("""<div class="post__player-title">""", '')
+    sentence = sentence.replace("</div>", '').strip()
 
     # Replaces <strong> tags with bold and underline
-    text = re.sub(r"<strong>\s*", "<u><b>", text)
-    text = re.sub(r"(\W*)\s*<\/strong>", r"</u></b>\1", text)
-    text = re.sub(r"(<\/u><\/b>)(\w+)", r"\1 \2", text)
+    sentence = re.sub(r"<strong>\s*", "<u><b>", sentence)
+    sentence = re.sub(r"(\W*)\s*<\/strong>", r"</u></b>\1", sentence)
+    sentence = re.sub(r"(<\/u><\/b>)(\w+)", r"\1 \2", sentence)
 
     # Removes extra whitespace
-    text = text.replace("  ", " ")
+    sentence = sentence.replace("  ", " ")
 
     # Adds full stop if necessary
-    print(text)
-    text = re.sub(r"(\w+)\Z", r"\1.\'", text)
-    text = re.sub(r"(<\/u><\/b>)\Z", r"\1.", text)
+    # print(sentence)
+    sentence = re.sub(r"(\w+)\Z", r"\1.\'", sentence)
+    sentence = re.sub(r"(<\/u><\/b>)\Z", r"\1.", sentence)
 
-    return text
+    return sentence
 
 
-def format_portuguese_text(text):
+def format_portuguese_sentence(sentence):
+    """ Cleans a portuguese sentence. Returns the new sentence """
+
     # Removes div tags and extra whitespace
-    text = re.sub(r"\s\s+", ' ', text)
-    text = text.replace("""<div class="post__player-text">""", '')
-    text = text.replace("</div>", '').strip()
-    print(text)
+    sentence = re.sub(r"\s\s+", ' ', sentence)
+    sentence = sentence.replace("""<div class="post__player-sentence">""", '')
+    sentence = sentence.replace("</div>", '').strip()
+    # print(sentence)
 
     # Replaces <strong> tags with bold and underline
-    text = re.sub(r"<strong>\s*", "<u><b>", text)
-    text = re.sub(r"(\W*)\s*<\/strong>", r"</u></b>\1", text)
-    text = re.sub(r"(<\/u><\/b>)(\w+)", r"\1 \2", text)
+    sentence = re.sub(r"<strong>\s*", "<u><b>", sentence)
+    sentence = re.sub(r"(\W*)\s*<\/strong>", r"</u></b>\1", sentence)
+    sentence = re.sub(r"(<\/u><\/b>)(\w+)", r"\1 \2", sentence)
 
     # Adds full stop if necessary
-    text = re.sub(r"(\w+)\Z", r"\1.", text)
-    text = re.sub(r"(<\/u><\/b>)\Z", r"\1.", text)
-    print(text)
+    sentence = re.sub(r"(\w+)\Z", r"\1.", sentence)
+    sentence = re.sub(r"(<\/u><\/b>)\Z", r"\1.", sentence)
+    # print(sentence)
 
-    return text
+    return sentence
 
 
 def post_to_card(targetPost):
+    """ Scrap a page for its french sentence,
+    portuguese sentence and download the corresponding audios.
+    Write these infos into a .csv file for Anki importing
+    """
+
     name = targetPost.split('/')[3]
     with open(f"csv/{name}.csv", "w+", encoding="utf8") as card:
         frenchSentences = list()
@@ -64,7 +76,7 @@ def post_to_card(targetPost):
 
         req = requests.get(targetPost)
         if req.status_code == 200:
-            print('Successful request!')
+            print('Successful GET request!')
 
             # Retrieving the html content
             content = req.content
@@ -74,7 +86,7 @@ def post_to_card(targetPost):
             for div in html.select('div'):
                 try:
                     if "post__player-title" in div["class"]:
-                        frenchSentences.append(format_french_text(str(div)))
+                        frenchSentences.append(format_french_sentence(str(div)))
                 except KeyError:
                     pass
             # print(frenchSentences)
@@ -83,7 +95,7 @@ def post_to_card(targetPost):
             for div in html.select('div'):
                 try:
                     if "post__player-text" in div["class"]:
-                        portugueseSentences.append(format_portuguese_text(str(div)))
+                        portugueseSentences.append(format_portuguese_sentence(str(div)))
                 except KeyError:
                     pass
             # print(portugueseSentences)
@@ -102,33 +114,80 @@ def post_to_card(targetPost):
             for i in range(0, len(cardInfos) - 2, 3):
                 card.write(f"{cardInfos[i]}|{cardInfos[i + 1]}|[sound:{cardInfos[i + 2]}]|frances_fluente\n")
         else:
-            print("Failed request.")
+            print("Failed GET request.")
 
 
-def scrap_page(targetPage):
-    req = requests.get(targetPage)
-    if req.status_code == 200:
-        print('Successful request!')
-        # Retrieving the HTML content
-        content = req.content
+def crawl_page(targetPage):
+    """ Crawls the target page ("Francês Fluente") to get
+    posts URLs. Save URLs whose posts have been labeled with specific categories
+    """
 
-        # Extracting audios URLs
-        html = BeautifulSoup(content, 'html.parser')
-        posts = list()
-        for p in html.select("a"):
-            if "este-phrasal-verb" in p["href"]:
-                posts.append(p["href"]) if p["href"] not in posts else posts
-        for post in posts:
-            print(f"Scraping {post}...")
-            post_to_card(post)
+    page = 1  # Starting page
+    crawledLinks = list()  # Storing crawled links
+    crawlerLimit = 0  # Limit for crawling
+    with requests.Session() as session:
+        while True:
+            found = 0
+            response = session.post("https://www.francesfluente.com/wp-admin/admin-ajax.php", data={'action': 'loadmore', 'query': 'null', 'page': page})
+
+            if response.status_code == 200:
+                print('Successful POST request!')
+                # Retrieving the HTML content
+                content = response.content
+
+                # Extracting audios URLs
+                html = BeautifulSoup(content, 'html.parser')
+
+                results = html.select('a')
+                for post in results:
+                    if "Como se diz" in str(post)\
+                        or "Expressões" in str(post)\
+                        or "significa" in str(post)\
+                        or "gírias" in str(post):
+                        found = 1
+                        print(post['href'])
+                        crawledLinks.append(post['href'])
+            else:
+                print("Failed POST request.")
+                break
+
+            # Workaround for when the crawler can't find more posts
+            if (found == 0):
+                crawlerLimit += 1
+            if crawlerLimit >= 2:
+                print("Not finding any more posts. Ending crawler.")
+                break
+
+            page += 1
+
+        # Saves posts URLs to a .txt file
+        with open("posts_urls.txt", "w+", encoding="UTF8") as URLsFile:
+            for post in crawledLinks:
+                URLsFile.write(f"{post}\n")
     pass
+
+
+def scrap_pages(postsURLsFile):
+    """ Scrap the URLs stored in the .txt file """
+
+    with open(postsURLsFile) as f:
+        urls = f.readlines()
+    print(f"{len(urls)} URLs found.")
+    urlCounter = 1
+    for url in urls:
+        print(f"Scraping post number {urlCounter}: {url}...")
+        post_to_card(url)
+        urlCounter += 1
 
 
 if __name__ == "__main__":
-    post_to_card("https://www.francesfluente.com/cest-clair/")
+    try:
+        if sys.argv[1].lower() == 'c':
+            crawl_page("https://francesfluente.com")
+    except IndexError:
+        crawl_page("https://francesfluente.com")
+        pass
+
+    scrap_pages("posts_urls.txt")
+
     pass
-
-
-# TODO: Crawler to get links from "load more posts"
-#        with requests.Session() as session:
-#            response = session.post("https://www.francesfluente.com/wp-admin/admin-ajax.php", data={'action': 'loadmore', 'query': 'null', 'page': 1})
