@@ -36,7 +36,7 @@ def format_portuguese_text(text):
 
 def post_to_card(targetPost):
     name = targetPost.split('/')[3]
-    with open(f"{name}.csv", "w+", encoding="utf8") as card:
+    with open(f"csv/{name}.csv", "w+", encoding="utf8") as card:
         englishSentences = list()
         audiosFilenames = list()
 
@@ -68,7 +68,7 @@ def post_to_card(targetPost):
 
             cardInfos = [x for x in itertools.chain.from_iterable(itertools.zip_longest(englishSentences, portugueseSentences, audiosFilenames)) if x]
             # print(cardInfos)
-            for i in range(0, len(cardInfos) - 3, 3):
+            for i in range(0, len(cardInfos) - 2, 3):
                 card.write(f"{cardInfos[i]};{cardInfos[i + 1]};[sound:{cardInfos[i + 2]}];\n")
 
 
