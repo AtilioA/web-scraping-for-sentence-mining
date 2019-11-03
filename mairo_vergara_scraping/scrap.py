@@ -16,27 +16,31 @@ def download_file(url):
 
 def format_english_text(text):
     # Removes tags
-    text = re.sub(r"<p>|<em>|<strong>", '', text).strip()
+    text = re.sub(r"<p>|<em>|<strong>", '', text)
     text = re.sub(r"(<br\/>\/)", '', text)
 
     # Replaces <span> tag with bold and underline
+    print(text)
+    text = re.sub(r"<u>\s*", "<b><u>", text)
+    text = re.sub(r"(\W*)\s*<\/u>", r"</u></b>\1", text)
     text = re.sub(r"<span style=\"text-decoration: underline;\">\s*", "<b><u>", text)
     text = re.sub(r"(\W*)\s*<\/span>", r"</u></b>\1", text)
     text = re.sub(r"(<\/u><\/b>)(\w+)", r"\1 \2", text)
 
     # Removes extra whitespace
     text = text.replace("  ", " ")
+    text = text.replace("\n", " ")
 
     # Adds full stop if necessary
     text = re.sub(r"(\w+)\Z", r"\1.\'", text)
     text = re.sub(r"(<\/u><\/b>)\Z", r"\1.", text)
 
-    return text
+    return text.strip()
 
 
 def format_portuguese_text(text):
     # Removes tags
-    text = re.sub(r"<(\/)*p>|<(\/)*em>|<(\/)*strong>", '', text).strip()
+    text = re.sub(r"<(\/)*p>|<(\/)*em>|<(\/)*strong>", '', text)
     text = re.sub(r"(<br(\/)*>(\/)*)", '', text)
 
     # Replaces <span> tag with bold and underline
@@ -51,7 +55,7 @@ def format_portuguese_text(text):
     text = re.sub(r"(\w+)\s*\Z", r"\1.", text)
     text = re.sub(r"(<\/u><\/b>)\s*\Z", r"\1.", text)
 
-    return text
+    return text.strip()
 
 
 def post_to_card(targetPost):
@@ -62,7 +66,7 @@ def post_to_card(targetPost):
 
         req = requests.get(targetPost)
         if req.status_code == 200:
-            print('Successful request!')
+            print('Successful GET request!')
             # Retrieving the html content
             content = req.content
             html = BeautifulSoup(content, 'html.parser')
@@ -73,50 +77,65 @@ def post_to_card(targetPost):
             # print(englishSentences)
 
             # Extracting portuguese sentences
-            portugueseSentences = re.findall(r"(<br\/>.*)", str(html))
+            portugueseSentences = re.findall(r"(<br\s*\/*\s*>\s*\n*.*)", str(html))
             portugueseSentences = list(map(format_portuguese_text, portugueseSentences))
             # print(portugueseSentences)
 
             # Extracting audios URLs and downloading audios
-            for p in html.select('audio'):
-                print(f"Downloading {p['src']}")
-                localFilename = download_file(p['src'])
-                audiosFilenames.append(localFilename)
+            try:
+                for p in html.select('audio'):
+                    print(f"Downloading {p['src']}")
+                    localFilename = download_file(p['src'])
+                    audiosFilenames.append(localFilename)
+            except KeyError:  # Due to older posts html configuration
+                for audio in html.find_all('audio', class_="wp-audio-shortcode"):
+                    for a in audio.find_all('a'):
+                        print(f"Downloading {a['href']}")
+                        localFilename = download_file(a['href'])
+                        audiosFilenames.append(localFilename)
 
             if len(englishSentences) != len(portugueseSentences) != len(audiosFilenames):
-                print("Lists don't have all the same length. Output may be compromised.\n")
+                print(f"Lists don't have all the same length. Output may be compromised.\n{len(englishSentences)}, {len(portugueseSentences)}, {len(audiosFilenames)}")
+
             cardInfos = [x for x in itertools.chain.from_iterable(itertools.zip_longest(englishSentences, portugueseSentences, audiosFilenames)) if x]
             # print(cardInfos)
             for i in range(0, len(cardInfos) - 2, 3):
-                card.write(f"{cardInfos[i]}|{cardInfos[i + 1]}|[sound:{cardInfos[i + 2]}]|english_mairo\n")
+                card.write(f"{cardInfos[i]}^{cardInfos[i + 1]}^[sound:{cardInfos[i + 2]}]^english_mairo\n")
         else:
-            print("Failed request.")
+            print("Failed GET request.")
 
 
 def scrap_page(targetPage):
-    req = requests.get(targetPage)
+    req = requests.get(targetPage, allow_redirects=False)
     if req.status_code == 200:
-        print('Successful request!')
+        print('Successful GET request!')
         # Retrieving the HTML content
         content = req.content
         html = BeautifulSoup(content, 'html.parser')
 
+        # Extracting posts URLs
         posts = list()
         nPosts = 0
-        for p in html.select("a"):
-            if "este-phrasal-verb" in p["href"]:
-                posts.append(p["href"]) if p["href"] not in posts else posts
+        for div in html.find_all("div", class_="td-module-image"):
+            for a in div.find_all("a", class_="td-image-wrap"):
+                posts.append(a["href"])
+
+        # Scraping each post in the list
         print(f"{len(posts)} posts found.")
         for post in posts:
             nPosts += 1
-            print(f"Scraping post number {nPosts}: {post}...")
+            print(f"\nScraping post number {nPosts}: {post}...")
             post_to_card(post)
+    else:
+        print("Failed GET request.")
     pass
 
 
 if __name__ == "__main__":
     # post_to_card("https://www.mairovergara.com/act-as-o-que-significa-este-phrasal-verb/")
-    targetUrl = "https://www.mairovergara.com/category/phrasal-verbs/"
-    print(f"The script will scrap {targetUrl}.\n")
-    scrap_page(targetUrl)
+    scrap_page("https://www.mairovergara.com/category/phrasal-verbs/")
+    for i in range(2, 9):
+        targetUrl = f"https://www.mairovergara.com/category/phrasal-verbs/page/{i}/"
+        print(f"The script will scrap {targetUrl}.\n")
+        scrap_page(targetUrl)
     pass
