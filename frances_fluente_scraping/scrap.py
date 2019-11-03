@@ -22,19 +22,19 @@ def format_french_sentence(sentence):
 
     # Removes div tags
     sentence = sentence.replace("""<div class="post__player-title">""", '')
-    sentence = sentence.replace("</div>", '').strip()
+    sentence = sentence.replace("</div>", '')
 
     # Replaces <strong> tags with bold and underline
-    sentence = re.sub(r"<strong>\s*", "<u><b>", sentence)
+    sentence = re.sub(r"<strong>\s*", "<b><u>", sentence)
     sentence = re.sub(r"(\W*)\s*<\/strong>", r"</u></b>\1", sentence)
     sentence = re.sub(r"(<\/u><\/b>)(\w+)", r"\1 \2", sentence)
 
     # Removes extra whitespace
-    sentence = sentence.replace("  ", " ")
+    sentence = sentence.replace("  ", " ").strip()
 
     # Adds full stop if necessary
     # print(sentence)
-    sentence = re.sub(r"(\w+)\Z", r"\1.\'", sentence)
+    sentence = re.sub(r"(\w+)\Z", r"\1.", sentence)
     sentence = re.sub(r"(<\/u><\/b>)\Z", r"\1.", sentence)
 
     return sentence
@@ -45,14 +45,17 @@ def format_portuguese_sentence(sentence):
 
     # Removes div tags and extra whitespace
     sentence = re.sub(r"\s\s+", ' ', sentence)
-    sentence = sentence.replace("""<div class="post__player-sentence">""", '')
-    sentence = sentence.replace("</div>", '').strip()
+    sentence = sentence.replace("""<div class="post__player-text">""", '')
+    sentence = sentence.replace("</div>", '')
     # print(sentence)
 
     # Replaces <strong> tags with bold and underline
-    sentence = re.sub(r"<strong>\s*", "<u><b>", sentence)
+    sentence = re.sub(r"<strong>\s*", "<b><u>", sentence)
     sentence = re.sub(r"(\W*)\s*<\/strong>", r"</u></b>\1", sentence)
     sentence = re.sub(r"(<\/u><\/b>)(\w+)", r"\1 \2", sentence)
+
+    # Removes extra whitespace
+    sentence = sentence.replace("  ", " ").strip()
 
     # Adds full stop if necessary
     sentence = re.sub(r"(\w+)\Z", r"\1.", sentence)
@@ -140,10 +143,10 @@ def crawl_page(targetPage):
 
                 results = html.select('a')
                 for post in results:
-                    if "Como se diz" in str(post)\
-                        or "Expressões" in str(post)\
-                        or "significa" in str(post)\
-                        or "gírias" in str(post):
+                    if (
+                        "Como se diz" in str(post) or "Expressões" in str(post)
+                        or "significa" in str(post) or "gírias" in str(post)
+                    ):
                         found = 1
                         print(post['href'])
                         crawledLinks.append(post['href'])
