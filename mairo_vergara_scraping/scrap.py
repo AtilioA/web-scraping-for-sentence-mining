@@ -64,7 +64,8 @@ def post_to_card(targetPost):
         englishSentences = list()
         audiosFilenames = list()
 
-        req = requests.get(targetPost)
+        headers = {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36'}
+        req = requests.get(targetPost, headers=headers)
         if req.status_code == 200:
             print('Successful GET request!')
             # Retrieving the html content
