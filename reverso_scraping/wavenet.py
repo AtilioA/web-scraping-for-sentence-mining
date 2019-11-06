@@ -5,7 +5,7 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "api_key.json"
 
 # Select the type of audio file
 audio_config = texttospeech.types.AudioConfig(
-    audio_encoding=texttospeech.enums.AudioEncoding.MP3)
+    audio_encoding=texttospeech.enums.AudioEncoding.OGG_OPUS)
 
 # Instantiates a client
 client = texttospeech.TextToSpeechClient()
@@ -29,3 +29,7 @@ def generate_audio(path, sentence, language):
     # Write the response to the output audio file.
         out.write(response.audio_content)
         print(f'Audio content written to file "{path}{sentence}.mp3"')
+
+
+if __name__ == "__main__":
+    # generate_audio("", "", "en-US")
