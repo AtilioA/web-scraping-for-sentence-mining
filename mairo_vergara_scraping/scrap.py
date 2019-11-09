@@ -17,10 +17,11 @@ def download_file(url):
 def format_english_text(text):
     # Removes tags
     text = re.sub(r"<p>|<em>|<strong>", '', text)
+    text = re.sub(r"<\/p>|<\/em>|<\/strong>", '', text)
     text = re.sub(r"(<br\/>\/)", '', text)
 
     # Replaces <span> tag with bold and underline
-    print(text)
+    # print(text)
     text = re.sub(r"<u>\s*", "<b><u>", text)
     text = re.sub(r"(\W*)\s*<\/u>", r"</u></b>\1", text)
     text = re.sub(r"<span style=\"text-decoration: underline;\">\s*", "<b><u>", text)
@@ -73,7 +74,9 @@ def post_to_card(targetPost):
             html = BeautifulSoup(content, 'html.parser')
 
             # Extracting english sentences
-            englishSentences = ["".join(x) for x in re.findall(r"(<p>)(.*?)(<br(\/)*>)", str(html))]
+            englishSentences = ["".join(x) for x in re.findall(r"(?<=<p>)(.*?)(<br\s*(\/)*>)", str(html))]
+            # print(re.findall(r"(?<=<p>)(.*?)(<br\s*(\/)*>)", str(html)))
+            # print(str(html))
             englishSentences = list(map(format_english_text, englishSentences))
             # print(englishSentences)
 
@@ -95,13 +98,28 @@ def post_to_card(targetPost):
                         localFilename = download_file(a['href'])
                         audiosFilenames.append(localFilename)
 
-            if len(englishSentences) != len(portugueseSentences) != len(audiosFilenames):
-                print(f"Lists don't have all the same length. Output may be compromised.\n{len(englishSentences)}, {len(portugueseSentences)}, {len(audiosFilenames)}")
+            # Ignoring empty entries
+            try:
+                englishSentences.remove('')
+            except ValueError:
+                pass
+            try:
+                portugueseSentences.remove('')
+            except ValueError:
+                pass
+            try:
+                audiosFilenames.remove('')
+            except ValueError:
+                pass
 
-            cardInfos = [x for x in itertools.chain.from_iterable(itertools.zip_longest(englishSentences, portugueseSentences, audiosFilenames)) if x]
-            # print(cardInfos)
-            for i in range(0, len(cardInfos) - 2, 3):
-                card.write(f"{cardInfos[i]}^{cardInfos[i + 1]}^[sound:{cardInfos[i + 2]}]^english_mairo\n")
+            if len(englishSentences) != len(portugueseSentences) != len(audiosFilenames):
+                print(f"Lists still don't have all the same length. Output may be compromised.\n{len(englishSentences)}, {len(portugueseSentences)}, {len(audiosFilenames)}")
+            # cardInfos = [x for x in itertools.chain.from_iterable(itertools.zip_longest(englishSentences, portugueseSentences, audiosFilenames)) if x]
+            for i in range(0, len(englishSentences)):
+            try:
+                card.write(f"{englishSentences[i]}^{portugueseSentences[i]}^[sound:{audiosFilenames[i]}]^english_mairo\n")
+            except IndexError:
+                pass
         else:
             print("Failed GET request.")
 
@@ -133,10 +151,9 @@ def scrap_page(targetPage):
 
 
 if __name__ == "__main__":
-    # post_to_card("https://www.mairovergara.com/act-as-o-que-significa-este-phrasal-verb/")
-    scrap_page("https://www.mairovergara.com/category/phrasal-verbs/")
-    for i in range(2, 9):
-        targetUrl = f"https://www.mairovergara.com/category/phrasal-verbs/page/{i}/"
-        print(f"The script will scrap {targetUrl}.\n")
-        scrap_page(targetUrl)
+    post_to_card("https://www.mairovergara.com/leave-out-o-que-significa-este-phrasal-verb/")
+    # for i in range(2, 9):
+    #     targetUrl = f"https://www.mairovergara.com/category/phrasal-verbs/page/{i}/"
+    #     print(f"The script will scrap {targetUrl}.\n")
+    #     scrap_page(targetUrl)
     pass
