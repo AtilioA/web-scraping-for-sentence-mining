@@ -3,7 +3,7 @@ import requests
 import itertools
 from bs4 import BeautifulSoup
 from google.cloud import texttospeech
-from wavenet import generate_audio
+from wavenet import generate_audio, generate_audio_random, get_modified_path
 
 
 def format_french_sentence(sentence):
@@ -57,8 +57,8 @@ def crawl_page(targetURL):
 
 def scrap_page(targetURL):
     """ Scraps a single URL for sentences and generates audios using WaveNet """
-
-    name = targetURL.split('/')[5]
+    name = targetURL.split('/')[5][:-1]
+    # print(name)
     with open(f"csv/{name}.csv", "w+", encoding="utf8") as card:
         # Reverso requires user-agent, otherwise will refuse the request
         headers = {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36'}
@@ -76,7 +76,7 @@ def scrap_page(targetURL):
             for span in html.find_all("span", lang="fr")[0:8:2]:
                 frenchSentences.append(''.join(map(str, span.contents)).strip())
             frenchSentences = list(map(format_french_sentence, frenchSentences))
-            print(frenchSentences)
+            # print(frenchSentences)
 
             # Extracting portuguese sentences
             portugueseSentences = list()
@@ -84,15 +84,15 @@ def scrap_page(targetURL):
                 for span in div.find_all("span", class_="text"):
                     portugueseSentences.append(''.join(map(str, span.contents)).strip())
             portugueseSentences = list(map(format_portuguese_sentence, portugueseSentences))
-            print(portugueseSentences)
+            # print(portugueseSentences)
 
             # Generate audios for french sentences
             # Using Google's WaveNet API
             for sentence in frenchSentences:
                 # Strip sentences of html tags, otherwise will raise FileNotFoundError exception
                 cleanSentence = BeautifulSoup(sentence, "lxml").text
-                generate_audio(audiosPath, cleanSentence, language)
-                audiosFilenames.append(cleanSentence)
+                generate_audio_random(audiosPath, cleanSentence, language)
+                audiosFilenames.append(get_modified_path(cleanSentence))
 
             if len(frenchSentences) != len(portugueseSentences) != len(audiosFilenames):
                 print(f"Lists don't have all the same length. Output may be compromised.\n{len(frenchSentences)}, {len(portugueseSentences)}, {len(audiosFilenames)}")
@@ -117,6 +117,11 @@ if __name__ == "__main__":
     client = texttospeech.TextToSpeechClient()
 
     # Tests
-    scrap_page("https://context.reverso.net/traducao/frances-portugues/se+souvenir")
-    scrap_page("https://context.reverso.net/traducao/frances-portugues/se+débarrasser")
-    scrap_page("https://context.reverso.net/traducao/frances-portugues/sac+à+main")
+    with open("target_urls.txt", encoding="UTF8") as file:
+        pages = file.readlines()
+
+        for page in pages:
+            print(f"Scraping {page}...")
+            scrap_page(page)
+    # scrap_page("https://context.reverso.net/traducao/frances-portugues/se+débarrasser")
+    # scrap_page("https://context.reverso.net/traducao/frances-portugues/sac+à+main")
