@@ -44,7 +44,9 @@ def format_portuguese_text(text):
     text = re.sub(r"<(\/)*p>|<(\/)*em>|<(\/)*strong>", '', text)
     text = re.sub(r"(<br(\/)*>(\/)*)", '', text)
 
-    # Replaces <span> tag with bold and underline
+    # Replaces tags with bold and underline
+    text = re.sub(r"<u>\s*", "<b><u>", text)
+    text = re.sub(r"(\W*)\s*<\/u>", r"</u></b>\1", text)
     text = re.sub(r"<span style=\"text-decoration: underline;\">\s*", "<b><u>", text)
     text = re.sub(r"(\W*)\s*<\/span>", r"</u></b>\1", text)
     text = re.sub(r"(<\/u><\/b>)(\w+)", r"\1 \2", text)
@@ -77,22 +79,22 @@ def post_to_card(targetPost):
             englishSentences = ["".join(x) for x in re.findall(r"(?<=<p>)(.*?)(<br\s*(\/)*>)", str(html))]
             # print(re.findall(r"(?<=<p>)(.*?)(<br\s*(\/)*>)", str(html)))
             # print(str(html))
-            englishSentences = list(map(format_english_text, englishSentences))
+            englishSentences = list(map(format_english_text, englishSentences))[0:-1:3]
             # print(englishSentences)
 
             # Extracting portuguese sentences
-            portugueseSentences = re.findall(r"(<br\s*\/*\s*>\s*\n*.*)", str(html))
-            portugueseSentences = list(map(format_portuguese_text, portugueseSentences))
+            portugueseSentences = re.findall(r"(?<!em>.)(<br\s*\/*\s*>\s*\n*.*)", str(html))
+            portugueseSentences = list(map(format_portuguese_text, portugueseSentences))[0:-1:3]
             # print(portugueseSentences)
 
             # Extracting audios URLs and downloading audios
             try:
-                for p in html.select('audio'):
+                for p in html.select('audio')[0:-1:3]:
                     print(f"Downloading {p['src']}")
                     localFilename = download_file(p['src'])
                     audiosFilenames.append(localFilename)
             except KeyError:  # Due to older posts html configuration
-                for audio in html.find_all('audio', class_="wp-audio-shortcode"):
+                for audio in html.find_all('audio', class_="wp-audio-shortcode")[0:-1:3]:
                     for a in audio.find_all('a'):
                         print(f"Downloading {a['href']}")
                         localFilename = download_file(a['href'])
@@ -114,12 +116,15 @@ def post_to_card(targetPost):
 
             if len(englishSentences) != len(portugueseSentences) != len(audiosFilenames):
                 print(f"Lists still don't have all the same length. Output may be compromised.\n{len(englishSentences)}, {len(portugueseSentences)}, {len(audiosFilenames)}")
+                with open("failed.txt", "a+", encoding="UTF8") as file:
+                    file.write(f"{targetPost}\n")
+            else:
             # cardInfos = [x for x in itertools.chain.from_iterable(itertools.zip_longest(englishSentences, portugueseSentences, audiosFilenames)) if x]
-            for i in range(0, len(englishSentences)):
-            try:
-                card.write(f"{englishSentences[i]}^{portugueseSentences[i]}^[sound:{audiosFilenames[i]}]^english_mairo\n")
-            except IndexError:
-                pass
+                for i in range(0, len(englishSentences)):
+                    try:
+                        card.write(f"{englishSentences[i]}^{portugueseSentences[i]}^[sound:{audiosFilenames[i]}]^english_mairo\n")
+                    except IndexError:
+                        pass
         else:
             print("Failed GET request.")
 
@@ -151,7 +156,7 @@ def scrap_page(targetPage):
 
 
 if __name__ == "__main__":
-    post_to_card("https://www.mairovergara.com/leave-out-o-que-significa-este-phrasal-verb/")
+    post_to_card("https://www.mairovergara.com/grow-on-%E2%94%82o-que-significa-este-phrasal-verb/")
     # for i in range(2, 9):
     #     targetUrl = f"https://www.mairovergara.com/category/phrasal-verbs/page/{i}/"
     #     print(f"The script will scrap {targetUrl}.\n")
