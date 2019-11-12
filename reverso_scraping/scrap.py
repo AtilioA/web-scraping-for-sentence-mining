@@ -39,9 +39,6 @@ def format_portuguese_sentence(sentence):
     sentence = re.sub(r"(\W*)\s*<\/strong>", r"</u></b>\1", sentence)
     sentence = re.sub(r"(<\/u><\/b>)(\w+)", r"\1 \2", sentence)
 
-    # Removes extra whitespace
-    # sentence = sentence.replace("  ", " ").strip()
-
     # Adds full stop if necessary
     sentence = re.sub(r"(\w+)\s*\Z", r"\1.", sentence)
     sentence = re.sub(r"(<\/u><\/b>)\s*\Z", r"\1.", sentence)
@@ -57,49 +54,54 @@ def crawl_page(targetURL):
 
 def scrap_page(targetURL):
     """ Scraps a single URL for sentences and generates audios using WaveNet """
+
     name = targetURL.split('/')[5][:-1]
-    # print(name)
     with open(f"csv/{name}.csv", "w+", encoding="utf8") as card:
         # Reverso requires user-agent, otherwise will refuse the request
         headers = {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36'}
-
         req = requests.get(targetURL, headers=headers)
         if req.status_code == 200:
             audiosFilenames = list()
             print('Successful GET request!')
 
+            # Extracts the HTML content from the URL for parsing
             content = req.content
             html = BeautifulSoup(content, 'html.parser')
 
-            # Extracting french sentences
+            # Extracts raw french sentences
+            rawFrench = html.find_all("span", lang="fr")[0:6]
+            # Extracts raw portuguese sentences
+            rawPortuguese = html.find_all("div", class_="trg ltr")[0:6]
+
             frenchSentences = list()
-            for span in html.find_all("span", lang="fr")[0:8:2]:
-                frenchSentences.append(''.join(map(str, span.contents)).strip())
-            frenchSentences = list(map(format_french_sentence, frenchSentences))
-            # print(frenchSentences)
-
-            # Extracting portuguese sentences
             portugueseSentences = list()
-            for div in html.find_all("div", class_="trg ltr")[0:8:2]:
-                for span in div.find_all("span", class_="text"):
-                    portugueseSentences.append(''.join(map(str, span.contents)).strip())
-            portugueseSentences = list(map(format_portuguese_sentence, portugueseSentences))
-            # print(portugueseSentences)
+            # Cleaning sentences
+            for frenchElement, portugueseElement in zip(rawFrench, rawPortuguese):
+                frenchSentence = format_french_sentence(''.join(map(str, frenchElement.contents)))
 
-            # Generate audios for french sentences
-            # Using Google's WaveNet API
-            for sentence in frenchSentences:
+                span = portugueseElement.find("span", class_="text")
+                portugueseSentence = format_portuguese_sentence(''.join(map(str, span.contents)))
+
+                if len(frenchSentence) > 140 or len(portugueseSentence) > 140:  # Long sentences are hardly useful for studying
+                    print("Sentence is too long. Skipping it...")
+                    continue  # Skip them
+                else:
+                    frenchSentences.append(frenchSentence)
+                    portugueseSentences.append(portugueseSentence)
+
+            if len(frenchSentences) != len(portugueseSentences):  # If parsing fails
+                print(f"Lists don't have all the same length. Output may be compromised.\n{len(frenchSentences)}, {len(portugueseSentences)}")
+
+            cardInfos = list(zip(frenchSentences, portugueseSentences))
+            for i in range(len(cardInfos)):  # French sentences at index 0, portuguese sentences at index 1
+                # Generate audios for french sentences using Google's WaveNet API
                 # Strip sentences of html tags, otherwise will raise FileNotFoundError exception
-                cleanSentence = BeautifulSoup(sentence, "lxml").text
+                cleanSentence = BeautifulSoup(cardInfos[i][0], "lxml").text
                 generate_audio_random(audiosPath, cleanSentence, language)
                 audiosFilenames.append(get_modified_path(cleanSentence))
 
-            if len(frenchSentences) != len(portugueseSentences) != len(audiosFilenames):
-                print(f"Lists don't have all the same length. Output may be compromised.\n{len(frenchSentences)}, {len(portugueseSentences)}, {len(audiosFilenames)}")
-
-            cardInfos = [x for x in itertools.chain.from_iterable(itertools.zip_longest(frenchSentences, portugueseSentences, audiosFilenames)) if x]
-            for i in range(0, len(cardInfos) - 2, 3):
-                card.write(f"{cardInfos[i]}^{cardInfos[i + 1]}^[sound:{cardInfos[i + 2]}.mp3]^french_reverso\n")
+                # Write sentences and audios filenames to the .csv file
+                card.write(f"{cardInfos[i][0]}^{cardInfos[i][1]}^[sound:{audiosFilenames[-1]}.mp3]^french_reverso\n")
         else:
             print('Failed GET request.')
 
@@ -116,12 +118,11 @@ if __name__ == "__main__":
     # Instantiates a TTS client
     client = texttospeech.TextToSpeechClient()
 
-    # Tests
+    # Testing
     with open("target_urls.txt", encoding="UTF8") as file:
         pages = file.readlines()
 
         for page in pages:
             print(f"Scraping {page}...")
             scrap_page(page)
-    # scrap_page("https://context.reverso.net/traducao/frances-portugues/se+débarrasser")
-    # scrap_page("https://context.reverso.net/traducao/frances-portugues/sac+à+main")
+    scrap_page("https://context.reverso.net/translation/french-portuguese/article+de+journal")
