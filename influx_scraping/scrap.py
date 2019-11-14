@@ -37,9 +37,6 @@ def format_portuguese_sentence(sentence):
     sentence = re.sub(r"(\W*)\s*<\/strong>", r"</u></b>\1", sentence)
     sentence = re.sub(r"(<\/u><\/b>)(\w+)", r"\1 \2", sentence)
 
-    # Removes extra whitespace
-    # sentence = sentence.replace("  ", " ").strip()
-
     # Adds full stop if necessary
     sentence = re.sub(r"(\w+)\s*\Z", r"\1.", sentence)
     sentence = re.sub(r"(<\/u><\/b>)\s*\Z", r"\1.", sentence)
@@ -58,7 +55,6 @@ def scrap_page(targetURL):
 
     name = targetURL.split('/')[3]
     with open(f"csv/{name}.csv", "w+", encoding="utf8") as card:
-        # Reverso requires user-agent, otherwise will refuse the request
         headers = {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36'}
 
         req = requests.get(targetURL, headers=headers)
@@ -72,33 +68,21 @@ def scrap_page(targetURL):
             # Extracting english sentences
             englishSentences = list()
             div = html.find("div", class_="post-content")
-            # print(div)
-            for p in div.find_all("p"):
-                for strong in p.find_all("strong"):
-                    print(strong)
-                for strong in p.find_all("em"):
-                    print(strong)
-                    # print(''.join(map(str, strong.contents)).strip())
-                    # sentence = ''.join(map(str, strong.contents)).strip()
-                # englishSentences.append(''.join(map(str, span.contents)).strip())
-            # englishSentences = list(map(format_english_sentence, englishSentences))
-            # print(englishSentences)
-
-            # # Extracting portuguese sentences
-            # portugueseSentences = list()
-            # for div in html.find_all("div", class_="trg ltr")[0:8:2]:
-            #     for span in div.find_all("span", class_="text"):
-            #         portugueseSentences.append(''.join(map(str, span.contents)).strip())
-            # portugueseSentences = list(map(format_portuguese_sentence, portugueseSentences))
+            divStrings = list(map(str, div))
+            sentences = [x for x in divStrings if re.search(r"<p><strong>", x)]
+            sentences = [x.split('</strong>') for x in sentences]
+            englishSentences = [x[0] for x in sentences if "<u>" in str(x)]
+            portugueseSentences = [x[1] for x in sentences if "<u>" in str(x)]
             # print(portugueseSentences)
+            # print(len(portugueseSentences))
+            # print(englishSentences)
+            # print(len(englishSentences))
 
-            # # Generate audios for english sentences
-            # # Using Google's WaveNet API
-            # for sentence in englishSentences:
-            #     # Strip sentences of html tags, otherwise will raise FileNotFoundError exception
-            #     cleanSentence = BeautifulSoup(sentence, "lxml").text
-            #     generate_audio(audiosPath, cleanSentence, language)
-            #     audiosFilenames.append(cleanSentence)
+            # print(html)
+            # audios = re.findall(r"<audio src=.*\.mp3)(.*\n*<audio.*)*", str(html))
+            # print(audios)
+            # for audio in div.find_all("audio"):
+            #     print(audio)
 
             # if len(englishSentences) != len(portugueseSentences) != len(audiosFilenames):
             #     print(f"Lists don't have all the same length. Output may be compromised.\n{len(englishSentences)}, {len(portugueseSentences)}, {len(audiosFilenames)}")
