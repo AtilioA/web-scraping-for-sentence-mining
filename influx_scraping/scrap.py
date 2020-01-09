@@ -69,10 +69,11 @@ def scrap_page(targetURL):
             englishSentences = list()
             div = html.find("div", class_="post-content")
             divStrings = list(map(str, div))
-            sentences = [x for x in divStrings if re.search(r"<p><strong>", x)]
+            sentences = [x for x in divStrings if re.search(r"<p style=\"text-align: justify;\">", x)]
+            print(sentences)
             sentences = [x.split('</strong>') for x in sentences]
-            englishSentences = [x[0] for x in sentences if "<u>" in str(x)]
-            portugueseSentences = [x[1] for x in sentences if "<u>" in str(x)]
+            # englishSentences = [x[0] for x in sentences if "<u>" in str(x)]
+            # portugueseSentences = [x[1] for x in sentences if "<u>" in str(x)]
             # print(portugueseSentences)
             # print(len(portugueseSentences))
             # print(englishSentences)
@@ -96,4 +97,4 @@ def scrap_page(targetURL):
 
 if __name__ == "__main__":
     # Tests
-    scrap_page("https://blog.influx.com.br/o-que-significa-get-your-ducks-in-a-row-em-ingles")
+    scrap_page("https://blog.influx.com.br/parece-mas-nao-e-o-que-significa-it-gets-my-goat-em-ingles")

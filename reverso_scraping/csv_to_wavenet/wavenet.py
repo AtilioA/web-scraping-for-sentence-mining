@@ -6,7 +6,7 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "api_key.json"
 
 # Select the type of audio file
 audio_config = texttospeech.types.AudioConfig(
-    audio_encoding=texttospeech.enums.AudioEncoding.OGG_OPUS)
+    audio_encoding=texttospeech.enums.AudioEncoding.LINEAR16)
 
 # Instantiates a client
 client = texttospeech.TextToSpeechClient()
