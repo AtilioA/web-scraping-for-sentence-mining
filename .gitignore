@@ -108,3 +108,4 @@ venv.bak/
 *.txt
 *.json
 !requirements.txt
+!test*
