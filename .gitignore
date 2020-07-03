@@ -103,9 +103,15 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-*.csv
 *.mp3
+*.csv
+*.tsv
 *.txt
-*.json
+
+api_key.json
+make_audiobook.py
+
 !requirements.txt
-!test*
+
+.vscode/
+scraping/
