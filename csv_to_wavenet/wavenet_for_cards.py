@@ -1,8 +1,5 @@
-import sys
-sys.path.append("..")
-
 import pandas as pd
-from wavenet import generate_audio_random, get_modified_path
+from reverso_scraping.wavenet import generate_audio_random, get_modified_path
 
 
 if __name__ == "__main__":
