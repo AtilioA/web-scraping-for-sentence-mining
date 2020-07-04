@@ -4,6 +4,7 @@ import itertools
 from bs4 import BeautifulSoup
 from google.cloud import texttospeech
 from wavenet import generate_audio, generate_audio_random, get_modified_path
+from multiprocessing import Pool
 
 
 def format_french_sentence(sentence):
@@ -55,7 +56,7 @@ def crawl_top(targetURL, ranking=False):
     req = requests.get(targetURL, headers=headers)
     if req.status_code == 200:
         name = targetURL.split('/')[6][:-6]
-        with open(f"crawl_{name}.txt", "w+", encoding="utf8") as crawl:
+        with open(f"crawl_{name}.txt", "w+", encoding="utf-8") as crawl:
             print('Successful GET request!')
 
             # Extracts the HTML content from the URL for parsing
@@ -81,7 +82,7 @@ def scrap_page(targetURL):
     """ Scraps a single URL for sentences and generates audios using WaveNet """
 
     name = targetURL.split('/')[5][:-1]
-    with open(f"csv/{name}.csv", "w+", encoding="utf8") as card:
+    with open(f"csv/{name}.csv", "w+", encoding="utf-8") as card:
         # Reverso requires user-agent, otherwise will refuse the request
         headers = {
             'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36'}
@@ -128,7 +129,7 @@ def scrap_page(targetURL):
                 # Generate audios for french sentences using Google's WaveNet API
                 # Strip sentences of html tags, otherwise will raise FileNotFoundError exception
                 cleanSentence = BeautifulSoup(cardInfos[i][0], "lxml").text
-                generate_audio_random(audiosPath, cleanSentence, language)
+                generate_audio_random("audios/", cleanSentence, "fr-FR")
                 audiosFilenames.append(get_modified_path(cleanSentence))
 
                 # Write sentences and audios filenames to the .csv file
@@ -136,6 +137,22 @@ def scrap_page(targetURL):
                     f"{cardInfos[i][0]}^{cardInfos[i][1]}^[sound:{audiosFilenames[-1]}.mp3]^french_reverso\n")
         else:
             print('Failed GET request.')
+
+
+def scrap_pages_multithread(URLsTxtFile):
+    with open(URLsTxtFile, encoding="utf-8") as file:
+        pages = file.readlines()
+
+    with Pool(8) as p:
+        try:
+            p.map(scrap_page, pages)
+        except KeyboardInterrupt:
+            print('Got ^C while pool mapping, terminating the pool')
+            p.terminate()
+            print('Terminating pool...')
+            p.terminate()
+            p.join()
+            print('Done!')
 
 
 if __name__ == "__main__":
@@ -150,8 +167,10 @@ if __name__ == "__main__":
     # Instantiates a TTS client
     client = texttospeech.TextToSpeechClient()
 
+    scrap_pages_multithread("crawled/1-10000/w-1-10000.txt")
+
     # Testing
-    # with open("target_urls.txt", encoding="UTF8") as file:
+    # with open("target_urls.txt", encoding="utf-8") as file:
     #     pages = file.readlines()
 
     #     for page in pages:
@@ -159,15 +178,3 @@ if __name__ == "__main__":
     #         scrap_page(page)
     # scrap_page("https://context.reverso.net/traducao/frances-portugues/ing%C3%A9rence")
     # crawl_top("https://context.reverso.net/traducao/index/frances-portugues/w.html", ranking=True)
-    # with open("crawl_w.txt", encoding="UTF8") as file:
-    #     pages = file.readlines()
-
-    #     for page in pages:
-    #         print(f"Scraping {page}...")
-    #         crawl_top(page)
-    with open("crawled/1-10000/w-1-10000.txt", encoding="UTF8") as file:
-        pages = file.readlines()
-
-        for page in pages:
-            print(f"Scraping {page}...")
-            scrap_page(page)
