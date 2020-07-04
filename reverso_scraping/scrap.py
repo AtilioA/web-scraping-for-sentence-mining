@@ -46,10 +46,35 @@ def format_portuguese_sentence(sentence):
     return sentence.strip()
 
 
-def crawl_page(targetURL):
-    """ Crawls a page looking for links to sentences """
+def crawl_top(targetURL, ranking=False):
+    """ Crawls top list or ranking page looking for links to target words/expressions """
 
-    pass
+    headers = {
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36'}
+
+    req = requests.get(targetURL, headers=headers)
+    if req.status_code == 200:
+        name = targetURL.split('/')[6][:-6]
+        with open(f"crawl_{name}.txt", "w+", encoding="utf8") as crawl:
+            print('Successful GET request!')
+
+            # Extracts the HTML content from the URL for parsing
+            content = req.content
+            html = BeautifulSoup(content, 'html.parser')
+
+            topListDiv = html.find("div", class_="top_list")
+            a = topListDiv.find_all("a")
+
+            if ranking:
+                hrefs = [a["href"] for a in a]
+            else:
+                # top lists have 'In Simon we trust' unwanted URL
+                hrefs = [a["href"] for a in a[:-1]]
+
+            for href in hrefs:
+                crawl.write(f"{href}\n")
+
+            return hrefs
 
 
 def scrap_page(targetURL):
@@ -71,16 +96,16 @@ def scrap_page(targetURL):
 
             # Extracts raw french sentences
             rawFrench = html.find_all("span", lang="fr")
-            sortedFrench = sorted(rawFrench, key=lambda elem: len(elem.text))[0:6]
             # Extracts raw portuguese sentences
             rawPortuguese = html.find_all("div", class_="trg ltr")
-            sortedPortuguese = sorted(rawPortuguese, key=lambda elem: len(elem.text))[0:6]
-            print(rawFrench, rawPortuguese)
+
+            linkedSentences = zip(rawFrench, rawPortuguese)
+            sortedSentences = sorted(linkedSentences, key=lambda elem: len(elem[0].text))[0:6]
 
             frenchSentences = list()
             portugueseSentences = list()
             # Cleaning sentences
-            for frenchElement, portugueseElement in zip(sortedFrench, sortedPortuguese):
+            for frenchElement, portugueseElement in sortedSentences:
                 frenchSentence = format_french_sentence(''.join(map(str, frenchElement.contents)))
 
                 span = portugueseElement.find("span", class_="text")
@@ -132,4 +157,17 @@ if __name__ == "__main__":
     #     for page in pages:
     #         print(f"Scraping {page}...")
     #         scrap_page(page)
-    scrap_page("https://context.reverso.net/traducao/frances-portugues/ing%C3%A9rence")
+    # scrap_page("https://context.reverso.net/traducao/frances-portugues/ing%C3%A9rence")
+    # crawl_top("https://context.reverso.net/traducao/index/frances-portugues/w.html", ranking=True)
+    # with open("crawl_w.txt", encoding="UTF8") as file:
+    #     pages = file.readlines()
+
+    #     for page in pages:
+    #         print(f"Scraping {page}...")
+    #         crawl_top(page)
+    with open("crawled/1-10000/w-1-10000.txt", encoding="UTF8") as file:
+        pages = file.readlines()
+
+        for page in pages:
+            print(f"Scraping {page}...")
+            scrap_page(page)
