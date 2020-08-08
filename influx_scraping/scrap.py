@@ -1,6 +1,18 @@
 import re
 import requests
 from bs4 import BeautifulSoup
+import shutil
+
+
+def download_file(url):
+    """ Download file from URL """
+
+    local_filename = url.split("/")[-1]
+    with requests.get(url, stream=True) as r:
+        with open(f"audios/{local_filename}", "wb") as f:
+            shutil.copyfileobj(r.raw, f)
+
+    return local_filename
 
 
 def format_english_sentence(sentence):
@@ -64,6 +76,7 @@ def scrap_page(targetURL):
             englishSentences = list()
             portugueseSentences = list()
             audiosURLs = list()
+            audioFilenames = list()
 
             content = req.content
             html = BeautifulSoup(content, "html.parser")
@@ -93,17 +106,23 @@ def scrap_page(targetURL):
                 map(format_english_sentence, englishSentences)
             )
 
-            if len(portugueseSentences) != len(englishSentences) != len(audiosURLs):
+            # Download audios
+            for url in audiosURLs:
+                print(f"Downloading {url}")
+                localFilename = download_file(url)
+                audioFilenames.append(localFilename)
+
+            if len(portugueseSentences) != len(englishSentences) != len(audioFilenames):
                 print(
                     f"""Lists don't have all the same length. Output may be compromised.
 - in '{name}':
-    ({len(englishSentences)} english sentences, {len(portugueseSentences)} portuguese sentences, {len(audiosURLs)} audio files.)"""
+    ({len(englishSentences)} english sentences, {len(portugueseSentences)} portuguese sentences, {len(audioFilenames)} audio files.)"""
                 )
 
-            cardInfos = zip(englishSentences, portugueseSentences, audiosURLs)
+            cardInfos = zip(englishSentences, portugueseSentences, audioFilenames)
             for sentence in cardInfos:
                 card.write(
-                    f"{sentence[0]}\t{sentence[1]}\t[sound:{sentence[2]}.mp3]\tenglish_influx\n"
+                    f"{sentence[0]}\t{sentence[1]}\t[sound:{sentence[2]}]\tenglish_influx\n"
                 )  # Use TAB as separator
         else:
             print("Failed GET request.")
