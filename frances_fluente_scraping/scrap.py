@@ -9,9 +9,9 @@ import itertools
 def download_file(url):
     """ Downloads url to audios folder """
 
-    local_filename = url.split('/')[-1]
+    local_filename = url.split("/")[-1]
     with requests.get(url, stream=True) as r:
-        with open(f"audios/{local_filename}", 'wb') as f:
+        with open(f"audios/{local_filename}", "wb") as f:
             shutil.copyfileobj(r.raw, f)
 
     return local_filename
@@ -21,8 +21,8 @@ def format_french_sentence(sentence):
     """ Cleans a french sentence. Returns the new sentence """
 
     # Removes div tags
-    sentence = sentence.replace("""<div class="post__player-title">""", '')
-    sentence = sentence.replace("</div>", '')
+    sentence = sentence.replace("""<div class="post__player-title">""", "")
+    sentence = sentence.replace("</div>", "")
 
     # Replaces <strong> tags with bold and underline
     sentence = re.sub(r"<strong>\s*", "<b><u>", sentence)
@@ -44,9 +44,9 @@ def format_portuguese_sentence(sentence):
     """ Cleans a portuguese sentence. Returns the new sentence """
 
     # Removes div tags and extra whitespace
-    sentence = re.sub(r"\s\s+", ' ', sentence)
-    sentence = sentence.replace("""<div class="post__player-text">""", '')
-    sentence = sentence.replace("</div>", '')
+    sentence = re.sub(r"\s\s+", " ", sentence)
+    sentence = sentence.replace("""<div class="post__player-text">""", "")
+    sentence = sentence.replace("</div>", "")
     # print(sentence)
 
     # Replaces <strong> tags with bold and underline
@@ -71,23 +71,25 @@ def post_to_card(targetPost):
     Write these infos into a .csv file for Anki importing
     """
 
-    name = targetPost.split('/')[3]
+    name = targetPost.split("/")[3]
     with open(f"csv/{name}.csv", "w+", encoding="utf8") as card:
         frenchSentences = list()
         portugueseSentences = list()
         audiosFilenames = list()
 
-        headers = {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36'}
+        headers = {
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36"
+        }
         req = requests.get(targetPost, headers=headers)
         if req.status_code == 200:
-            print('Successful GET request!')
+            print("Successful GET request!")
 
             # Retrieving the html content
             content = req.content
-            html = BeautifulSoup(content, 'html.parser')
+            html = BeautifulSoup(content, "html.parser")
 
             # Extracting french sentences
-            for div in html.select('div'):
+            for div in html.select("div"):
                 try:
                     if "post__player-title" in div["class"]:
                         frenchSentences.append(format_french_sentence(str(div)))
@@ -96,7 +98,7 @@ def post_to_card(targetPost):
             # print(frenchSentences)
 
             # Extracting portuguese sentences
-            for div in html.select('div'):
+            for div in html.select("div"):
                 try:
                     if "post__player-text" in div["class"]:
                         portugueseSentences.append(format_portuguese_sentence(str(div)))
@@ -105,18 +107,30 @@ def post_to_card(targetPost):
             # print(portugueseSentences)
 
             # Extracting audios URLs and downloading audios
-            for p in html.select('audio'):
+            for p in html.select("audio"):
                 localFilename = download_file(p.source["src"])
                 audiosFilenames.append(localFilename)
                 print(f"Downloading {localFilename}...")
             # print(audiosFilenames)
 
             if len(frenchSentences) != len(portugueseSentences) != len(audiosFilenames):
-                print("Lists don't have all the same length. Output may be compromised.\n")
+                print(
+                    "Lists don't have all the same length. Output may be compromised.\n"
+                )
             # Writing to .csv according to card's fields
-            cardInfos = [x for x in itertools.chain.from_iterable(itertools.zip_longest(frenchSentences, portugueseSentences, audiosFilenames)) if x]
+            cardInfos = [
+                x
+                for x in itertools.chain.from_iterable(
+                    itertools.zip_longest(
+                        frenchSentences, portugueseSentences, audiosFilenames
+                    )
+                )
+                if x
+            ]
             for i in range(0, len(cardInfos) - 2, 3):
-                card.write(f"{cardInfos[i]}|{cardInfos[i + 1]}|[sound:{cardInfos[i + 2]}]|frances_fluente\n")
+                card.write(
+                    f"{cardInfos[i]}|{cardInfos[i + 1]}|[sound:{cardInfos[i + 2]}]|frances_fluente\n"
+                )
         else:
             print("Failed GET request.")
 
@@ -132,31 +146,36 @@ def crawl_page(targetPage):
     with requests.Session() as session:
         while True:
             found = 0
-            response = session.post("https://www.francesfluente.com/wp-admin/admin-ajax.php", data={'action': 'loadmore', 'query': 'null', 'page': page})
+            response = session.post(
+                "https://www.francesfluente.com/wp-admin/admin-ajax.php",
+                data={"action": "loadmore", "query": "null", "page": page},
+            )
 
             if response.status_code == 200:
-                print('Successful POST request!')
+                print("Successful POST request!")
                 # Retrieving the HTML content
                 content = response.content
 
                 # Extracting audios URLs
-                html = BeautifulSoup(content, 'html.parser')
+                html = BeautifulSoup(content, "html.parser")
 
-                results = html.select('a')
+                results = html.select("a")
                 for post in results:
                     if (
-                        "Como se diz" in str(post) or "Expressões" in str(post)
-                        or "significa" in str(post) or "gírias" in str(post)
+                        "Como se diz" in str(post)
+                        or "Expressões" in str(post)
+                        or "significa" in str(post)
+                        or "gírias" in str(post)
                     ):
                         found = 1
-                        print(post['href'])
-                        crawledLinks.append(post['href'])
+                        print(post["href"])
+                        crawledLinks.append(post["href"])
             else:
                 print("Failed POST request.")
                 break
 
             # Workaround for when the crawler can't find more posts
-            if (found == 0):
+            if found == 0:
                 crawlerLimit += 1
             if crawlerLimit >= 2:
                 print("Not finding any more posts. Ending crawler.")
@@ -186,7 +205,7 @@ def scrap_pages(postsURLsFile):
 
 if __name__ == "__main__":
     try:
-        if sys.argv[1].lower() == 'c':
+        if sys.argv[1].lower() == "c":
             crawl_page("https://francesfluente.com")
     except IndexError:
         crawl_page("https://francesfluente.com")

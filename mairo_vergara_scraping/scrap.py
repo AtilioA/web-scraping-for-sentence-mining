@@ -9,9 +9,9 @@ import shutil
 def download_file(url):
     """ Download file from URL """
 
-    local_filename = url.split('/')[-1]
+    local_filename = url.split("/")[-1]
     with requests.get(url, stream=True) as r:
-        with open(f"audios/{local_filename}", 'wb') as f:
+        with open(f"audios/{local_filename}", "wb") as f:
             shutil.copyfileobj(r.raw, f)
 
     return local_filename
@@ -21,16 +21,15 @@ def format_english_text(text):
     # print(text)
 
     # Remove tags
-    text = re.sub(r"<p>|<em>|<strong>|/$", '', text)
-    text = re.sub(r"<\/p>|<\/em>|<\/strong>", '', text)
-    text = re.sub(r"(<br\/>\/)", '', text)
+    text = re.sub(r"<p>|<em>|<strong>|/$", "", text)
+    text = re.sub(r"<\/p>|<\/em>|<\/strong>", "", text)
+    text = re.sub(r"(<br\/>\/)", "", text)
 
     # Replace <span> tag with bold and underline
     # print(text)
     text = re.sub(r"<u>\s*", "<b><u>", text)
     text = re.sub(r"(\W*)\s*<\/u>", r"</u></b>\1", text)
-    text = re.sub(
-        r"<span style=\"text-decoration: underline;\">\s*", "<b><u>", text)
+    text = re.sub(r"<span style=\"text-decoration: underline;\">\s*", "<b><u>", text)
     text = re.sub(r"(\W*)\s*<\/span>", r"</u></b>\1", text)
     text = re.sub(r"(<\/u><\/b>)(\w+)", r"\1 \2", text)
 
@@ -47,14 +46,13 @@ def format_english_text(text):
 
 def format_portuguese_text(text):
     # Remove tags
-    text = re.sub(r"<(\/)*p>|<(\/)*em>|<(\/)*strong>", '', text)
-    text = re.sub(r"(<br(\/)*>(\/)*)", '', text)
+    text = re.sub(r"<(\/)*p>|<(\/)*em>|<(\/)*strong>", "", text)
+    text = re.sub(r"(<br(\/)*>(\/)*)", "", text)
 
     # Replace tags with bold and underline
     text = re.sub(r"<u>\s*", "<b><u>", text)
     text = re.sub(r"(\W*)\s*<\/u>", r"</u></b>\1", text)
-    text = re.sub(
-        r"<span style=\"text-decoration: underline;\">\s*", "<b><u>", text)
+    text = re.sub(r"<span style=\"text-decoration: underline;\">\s*", "<b><u>", text)
     text = re.sub(r"(\W*)\s*<\/span>", r"</u></b>\1", text)
     text = re.sub(r"(<\/u><\/b>)(\w+)", r"\1 \2", text)
 
@@ -69,65 +67,71 @@ def format_portuguese_text(text):
 
 
 def post_to_card(targetPost):
-    name = targetPost.split('/')[3]
+    name = targetPost.split("/")[3]
     with open(f"csv/{name}.csv", "w+", encoding="utf8") as card:
         englishSentences = list()
         audiosURLs = list()
         audiosFilenames = list()
 
         headers = {
-            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36'}
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36"
+        }
         req = requests.get(targetPost, headers=headers)
         if req.status_code == 200:
-            print('Successful GET request!')
+            print("Successful GET request!")
 
             # Retrieve HTML content
             content = req.content
-            html = BeautifulSoup(content, 'html.parser')
+            html = BeautifulSoup(content, "html.parser")
 
             # Extract english sentences
-            englishSentences = ["".join(x) for x in re.findall(
-                r"(?:<p.*?>)(.*?)(?:<br\s*(\/)*>)/?", str(html))]
+            englishSentences = [
+                "".join(x)
+                for x in re.findall(r"(?:<p.*?>)(.*?)(?:<br\s*(\/)*>)/?", str(html))
+            ]
             englishSentences = list(map(format_english_text, englishSentences))
             # print(englishSentences)
 
             # Extract portuguese sentences
             portugueseSentences = re.findall(
-                r"(?<!em>.)(<br\s*\/*\s*>\s*\n*.*)", str(html))
-            portugueseSentences = list(
-                map(format_portuguese_text, portugueseSentences))
+                r"(?<!em>.)(<br\s*\/*\s*>\s*\n*.*)", str(html)
+            )
+            portugueseSentences = list(map(format_portuguese_text, portugueseSentences))
             # print(portugueseSentences)
 
             # Extract audios URLs and downloading audios
             try:
-                for p in html.select('audio'):
+                for p in html.select("audio"):
                     print(f"Downloading {p['src']}")
                     # localFilename = download_file(p['src'])
-                    audiosURLs.append(p['src'])
+                    audiosURLs.append(p["src"])
             except KeyError:  # Due to older posts html configuration
-                for audio in html.find_all('audio', class_="wp-audio-shortcode"):
-                    for a in audio.find_all('a'):
-                        audiosURLs.append(a['href'])
+                for audio in html.find_all("audio", class_="wp-audio-shortcode"):
+                    for a in audio.find_all("a"):
+                        audiosURLs.append(a["href"])
 
             # Ignore empty entries
             try:
-                englishSentences.remove('')
+                englishSentences.remove("")
             except ValueError:
                 pass
             try:
-                portugueseSentences.remove('')
+                portugueseSentences.remove("")
             except ValueError:
                 pass
             try:
-                audiosURLs.remove('')
+                audiosURLs.remove("")
             except ValueError:
                 pass
 
             print(len(englishSentences), len(portugueseSentences), len(audiosURLs))
             # Try to adjust uneven lists
-            while len(englishSentences) != len(audiosURLs) or len(audiosURLs) != len(portugueseSentences):
+            while len(englishSentences) != len(audiosURLs) or len(audiosURLs) != len(
+                portugueseSentences
+            ):
                 print(
-                    f"Lists don't have all the same length. Output may be compromised. {len(englishSentences)} english sentences, {len(portugueseSentences)} portuguese sentences, {len(audiosURLs)} audio files.")
+                    f"Lists don't have all the same length. Output may be compromised. {len(englishSentences)} english sentences, {len(portugueseSentences)} portuguese sentences, {len(audiosURLs)} audio files."
+                )
                 if len(englishSentences) > len(audiosURLs):
                     englishSentences = englishSentences[1:]
                 elif len(portugueseSentences) > len(audiosURLs):
@@ -150,7 +154,8 @@ def post_to_card(targetPost):
             for i in range(0, len(englishSentences)):
                 try:
                     card.write(
-                        f"{englishSentences[i]}^{portugueseSentences[i]}^[sound:{audiosFilenames[i]}]^english_mairo\n")
+                        f"{englishSentences[i]}^{portugueseSentences[i]}^[sound:{audiosFilenames[i]}]^english_mairo\n"
+                    )
                 except IndexError:
                     print(f"Failed writing data do CSV.")
                     pass
@@ -161,10 +166,10 @@ def post_to_card(targetPost):
 def scrap_page(targetPage):
     req = requests.get(targetPage, allow_redirects=False)
     if req.status_code == 200:
-        print('Successful GET request!')
+        print("Successful GET request!")
         # Retrieve the HTML content
         content = req.content
-        html = BeautifulSoup(content, 'html.parser')
+        html = BeautifulSoup(content, "html.parser")
 
         # Extract posts URLs
         posts = list()
@@ -173,7 +178,7 @@ def scrap_page(targetPage):
             for a in div.find_all("a", class_="td-image-wrap"):
                 posts.append(a["href"])
 
-        with open('posts.txt', 'a+') as f:
+        with open("posts.txt", "a+") as f:
             for post in posts:
                 f.write(f"{post}\n")
 
@@ -188,7 +193,7 @@ def scrap_page(targetPage):
 
 
 def scrap_pages_txt(txtFilePath):
-    with open(Path(txtFilePath), 'r', encoding="utf-8") as f:
+    with open(Path(txtFilePath), "r", encoding="utf-8") as f:
         pages = f.readlines()
 
     for page in pages:
@@ -197,11 +202,13 @@ def scrap_pages_txt(txtFilePath):
 
 if __name__ == "__main__":
     # Logger for debugging purposes; logging HTTPS requests, etc
-    logging.basicConfig(format='%(asctime)s %(message)s',
-                        datefmt='%d/%m/%Y %H:%M:%S',
-                        filename='requests.log',
-                        level=logging.DEBUG)
-    logging.FileHandler("requests.log", mode='w')
+    logging.basicConfig(
+        format="%(asctime)s %(message)s",
+        datefmt="%d/%m/%Y %H:%M:%S",
+        filename="requests.log",
+        level=logging.DEBUG,
+    )
+    logging.FileHandler("requests.log", mode="w")
 
     # Logger for failed parsings
     failedLogger = logging.getLogger("failed")
@@ -211,7 +218,7 @@ if __name__ == "__main__":
     failedLogger.addHandler(failedLogger_file_handler)
 
     # scrap_pages_txt('posts.txt')
-    
+
     # scrap_page("https://www.mairovergara.com/category/como-se-diz-em-ingles/page/2/")
     # targetUrl = f"https://www.mairovergara.com/category/phrasal-verbs/page/{2}/"
     # for i in range(2, 11):

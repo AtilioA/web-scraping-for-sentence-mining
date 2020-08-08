@@ -29,10 +29,10 @@ def format_portuguese_sentence(sentence):
     """ Cleans a portuguese sentence. Returns the new sentence """
 
     # Removes <a> tags and extra whitespace
-    sentence = re.sub(r"\s\s+", ' ', sentence)
+    sentence = re.sub(r"\s\s+", " ", sentence)
     sentence = re.sub("""<a class="link_highlighted".*<em>""", "<b><u>", sentence)
     sentence = sentence.replace("</em>", "</u></b>")
-    sentence = sentence.replace("</a>", '')
+    sentence = sentence.replace("</a>", "")
     # print(sentence)
 
     # Replaces <strong> tags with bold and underline
@@ -51,17 +51,18 @@ def crawl_top(targetURL, ranking=False):
     """ Crawls top list or ranking page looking for links to target words/expressions """
 
     headers = {
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36'}
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36"
+    }
 
     req = requests.get(targetURL, headers=headers)
     if req.status_code == 200:
-        name = targetURL.split('/')[6][:-6]
+        name = targetURL.split("/")[6][:-6]
         with open(f"crawl_{name}.txt", "w+", encoding="utf-8") as crawl:
-            print('Successful GET request!')
+            print("Successful GET request!")
 
             # Extracts the HTML content from the URL for parsing
             content = req.content
-            html = BeautifulSoup(content, 'html.parser')
+            html = BeautifulSoup(content, "html.parser")
 
             topListDiv = html.find("div", class_="top_list")
             a = topListDiv.find_all("a")
@@ -81,19 +82,20 @@ def crawl_top(targetURL, ranking=False):
 def scrap_page(targetURL):
     """ Scraps a single URL for sentences and generates audios using WaveNet """
 
-    name = targetURL.split('/')[5][:-1]
+    name = targetURL.split("/")[5][:-1]
     with open(f"csv/{name}.csv", "w+", encoding="utf-8") as card:
         # Reverso requires user-agent, otherwise will refuse the request
         headers = {
-            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36'}
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36"
+        }
         req = requests.get(targetURL, headers=headers)
         if req.status_code == 200:
             audiosFilenames = list()
-            print('Successful GET request!')
+            print("Successful GET request!")
 
             # Extracts the HTML content from the URL for parsing
             content = req.content
-            html = BeautifulSoup(content, 'html.parser')
+            html = BeautifulSoup(content, "html.parser")
 
             # Extracts raw french sentences
             rawFrench = html.find_all("span", lang="fr")
@@ -101,16 +103,22 @@ def scrap_page(targetURL):
             rawPortuguese = html.find_all("div", class_="trg ltr")
 
             linkedSentences = zip(rawFrench, rawPortuguese)
-            sortedSentences = sorted(linkedSentences, key=lambda elem: len(elem[0].text))[0:6]
+            sortedSentences = sorted(
+                linkedSentences, key=lambda elem: len(elem[0].text)
+            )[0:6]
 
             frenchSentences = list()
             portugueseSentences = list()
             # Cleaning sentences
             for frenchElement, portugueseElement in sortedSentences:
-                frenchSentence = format_french_sentence(''.join(map(str, frenchElement.contents)))
+                frenchSentence = format_french_sentence(
+                    "".join(map(str, frenchElement.contents))
+                )
 
                 span = portugueseElement.find("span", class_="text")
-                portugueseSentence = format_portuguese_sentence(''.join(map(str, span.contents)))
+                portugueseSentence = format_portuguese_sentence(
+                    "".join(map(str, span.contents))
+                )
 
                 # Long sentences are hardly useful for studying
                 if len(frenchSentence) > 140 or len(portugueseSentence) > 140:
@@ -122,10 +130,13 @@ def scrap_page(targetURL):
 
             if len(frenchSentences) != len(portugueseSentences):  # If parsing fails
                 print(
-                    f"Lists don't have all the same length. Output may be compromised.\n{len(frenchSentences)}, {len(portugueseSentences)}")
+                    f"Lists don't have all the same length. Output may be compromised.\n{len(frenchSentences)}, {len(portugueseSentences)}"
+                )
 
             cardInfos = list(zip(frenchSentences, portugueseSentences))
-            for i in range(len(cardInfos)):  # French sentences at index 0, portuguese sentences at index 1
+            for i in range(
+                len(cardInfos)
+            ):  # French sentences at index 0, portuguese sentences at index 1
                 # Generate audios for french sentences using Google's WaveNet API
                 # Strip sentences of html tags, otherwise will raise FileNotFoundError exception
                 cleanSentence = BeautifulSoup(cardInfos[i][0], "lxml").text
@@ -134,9 +145,10 @@ def scrap_page(targetURL):
 
                 # Write sentences and audios filenames to the .csv file
                 card.write(
-                    f"{cardInfos[i][0]}^{cardInfos[i][1]}^[sound:{audiosFilenames[-1]}.mp3]^french_reverso\n")
+                    f"{cardInfos[i][0]}^{cardInfos[i][1]}^[sound:{audiosFilenames[-1]}.mp3]^french_reverso\n"
+                )
         else:
-            print('Failed GET request.')
+            print("Failed GET request.")
 
 
 def scrap_pages_multithread(URLsTxtFile):
@@ -147,12 +159,12 @@ def scrap_pages_multithread(URLsTxtFile):
         try:
             p.map(scrap_page, pages)
         except KeyboardInterrupt:
-            print('Got ^C while pool mapping, terminating the pool')
+            print("Got ^C while pool mapping, terminating the pool")
             p.terminate()
-            print('Terminating pool...')
+            print("Terminating pool...")
             p.terminate()
             p.join()
-            print('Done!')
+            print("Done!")
 
 
 if __name__ == "__main__":
@@ -162,7 +174,8 @@ if __name__ == "__main__":
     # Initializing WaveNet's variables
     # Select the type of audio file
     audio_config = texttospeech.types.AudioConfig(
-        audio_encoding=texttospeech.enums.AudioEncoding.LINEAR16)
+        audio_encoding=texttospeech.enums.AudioEncoding.LINEAR16
+    )
 
     # Instantiates a TTS client
     client = texttospeech.TextToSpeechClient()

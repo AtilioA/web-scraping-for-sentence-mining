@@ -4,7 +4,7 @@ from reverso_scraping.wavenet import generate_audio_random, get_modified_path
 
 if __name__ == "__main__":
     with open("new_cards.tsv", "w+", encoding="utf8") as f:
-        old = pd.read_csv("exported_cards.txt", sep='\t')
+        old = pd.read_csv("exported_cards.txt", sep="\t")
         print(old)
 
         audiosFilenames = []
@@ -22,9 +22,11 @@ if __name__ == "__main__":
             print(audioFilename)
 
             if pd.isnull(target):
-                target = ''
+                target = ""
             if pd.isnull(tags):
-                tags = ''
+                tags = ""
 
             print(f"Writing info to file...")
-            f.write(f"{french}\t{english}\t[sound:{audioFilename}.mp3]\t{target}\t{tags}\n")
+            f.write(
+                f"{french}\t{english}\t[sound:{audioFilename}.mp3]\t{target}\t{tags}\n"
+            )

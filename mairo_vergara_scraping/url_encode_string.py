@@ -6,7 +6,9 @@ def url_encode_string(string):
 
         Return encoded `string`.
     """
-    
+
     encodedString = string.replace(" ", "-")
-    encodedString = "".join(list(filter(lambda c: c not in "?.,!/;:’\'\"", encodedString)))
-    return re.sub('[^A-Za-z0-9\-]+', '', encodedString)
+    encodedString = "".join(
+        list(filter(lambda c: c not in "?.,!/;:’'\"", encodedString))
+    )
+    return re.sub("[^A-Za-z0-9\-]+", "", encodedString)

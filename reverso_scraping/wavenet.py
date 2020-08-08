@@ -1,12 +1,14 @@
 import os
 import random
 from google.cloud import texttospeech
+
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "api_key.json"
 
 
 # Select the type of audio file
 audio_config = texttospeech.types.AudioConfig(
-    audio_encoding=texttospeech.enums.AudioEncoding.LINEAR16)
+    audio_encoding=texttospeech.enums.AudioEncoding.LINEAR16
+)
 
 # Instantiates a client
 client = texttospeech.TextToSpeechClient()
@@ -15,7 +17,7 @@ client = texttospeech.TextToSpeechClient()
 def get_modified_path(originalPath):
     """Modifies the sentence's string so it can be used as a path"""
 
-    return ''.join(c for c in originalPath if c.isalpha())
+    return "".join(c for c in originalPath if c.isalpha())
 
 
 def generate_audio(path, sentence, language):
@@ -25,15 +27,15 @@ def generate_audio(path, sentence, language):
     # Build the voice request, select the language code and the ssml
     # voice gender ("neutral")
     voice = texttospeech.types.VoiceSelectionParams(
-        language_code=language,
-        ssml_gender=texttospeech.enums.SsmlVoiceGender.NEUTRAL)
+        language_code=language, ssml_gender=texttospeech.enums.SsmlVoiceGender.NEUTRAL
+    )
 
     # Perform the text-to-speech request on the text input with the selected
     # voice parameters and audio file type
     response = client.synthesize_speech(synthesis_input, voice, audio_config)
 
     # The response's audio_content is binary.
-    with open(f'{path}{sentence}.mp3', 'wb') as out:
+    with open(f"{path}{sentence}.mp3", "wb") as out:
         # Write the response to the output audio file.
         out.write(response.audio_content)
         print(f'Audio content written to file "{path}{sentence}.mp3"')
@@ -46,9 +48,12 @@ def generate_audio_random(path, sentence, language):
     synthesis_input = texttospeech.types.SynthesisInput(text=sentence)
 
     voices = client.list_voices()
-    selectedVoices = [voice.name for voice in voices.voices
-                      if (language in voice.language_codes or language in voice.language_codes)
-                      and "Standard" not in voice.name]
+    selectedVoices = [
+        voice.name
+        for voice in voices.voices
+        if (language in voice.language_codes or language in voice.language_codes)
+        and "Standard" not in voice.name
+    ]
     # print(selectedVoices)
     selectedVoice = random.choice(selectedVoices)
 
@@ -60,7 +65,7 @@ def generate_audio_random(path, sentence, language):
     voice = texttospeech.types.VoiceSelectionParams(
         name=selectedVoice,
         language_code=selectedVoice[0:5],
-        ssml_gender=texttospeech.enums.SsmlVoiceGender.SSML_VOICE_GENDER_UNSPECIFIED
+        ssml_gender=texttospeech.enums.SsmlVoiceGender.SSML_VOICE_GENDER_UNSPECIFIED,
     )
 
     # Perform the text-to-speech request on the text input with the selected
@@ -68,11 +73,12 @@ def generate_audio_random(path, sentence, language):
     response = client.synthesize_speech(synthesis_input, voice, audio_config)
 
     # The response's audio_content is binary.
-    with open(f'{path}{get_modified_path(sentence)}.mp3', 'wb') as out:
+    with open(f"{path}{get_modified_path(sentence)}.mp3", "wb") as out:
         # Write the response to the output audio file.
         out.write(response.audio_content)
         print(
-            f'Audio content written to file "{path}{get_modified_path(sentence)}.mp3"')
+            f'Audio content written to file "{path}{get_modified_path(sentence)}.mp3"'
+        )
 
 
 if __name__ == "__main__":
