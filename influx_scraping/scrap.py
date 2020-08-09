@@ -84,9 +84,14 @@ def scrap_page(targetURL):
             # Extract sentences
             div = html.find("div", class_="post-content")
             # Sentences are under this div
-            divStrings = "".join(list(map(str, div)))
-            sentencesRegex = r"<p.*?>(.*?)<em>(.*?)<\/em>.*?<\/p>\s+<audio.*?src=\"(.*?)\".*?><\/audio>"
-            findSentences = re.findall(sentencesRegex, divStrings)
+            # divStrings = "".join(list(map(str, div)))
+            # print(divStrings)
+            sentencesRegex = (
+                r"(?:<p.*?>(.*?)<em>(.*?)<br><span.*?><audio .*?src=(\".*?\"))"
+            )
+            findSentences = re.findall(
+                sentencesRegex, "".join(list(map(str, div))), re.MULTILINE
+            )
             for matches in findSentences:
                 englishSentences.append(matches[0])
                 portugueseSentences.append(matches[1])
@@ -130,6 +135,9 @@ def scrap_page(targetURL):
 
 if __name__ == "__main__":
     # Tests
-    scrap_page(
-        "https://blog.influx.com.br/parece-mas-nao-e-o-que-significa-it-gets-my-goat-em-ingles"
-    )
+    # with open("scrap_influx.txt", "r", encoding="utf-8") as f:
+    #     pages = f.readlines()
+
+    # for page in pages:
+    #     print(f"\n- Scraping {page}")
+    #     scrap_page(page[:-1])  # Remove '\n' from string
