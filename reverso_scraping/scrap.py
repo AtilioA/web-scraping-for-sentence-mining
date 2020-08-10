@@ -1,50 +1,52 @@
 import re
+import functools
 import requests
-import itertools
 from bs4 import BeautifulSoup
 from google.cloud import texttospeech
-from wavenet import generate_audio, generate_audio_random, get_modified_path
-from multiprocessing import Pool
+from wavenet import generate_audio_random, get_modified_path
+from multiprocessing import Pool, cpu_count
 
 
-def format_french_sentence(sentence):
-    """ Cleans a french sentence. Returns the new sentence """
+def format_french_sentence(frenchSentence):
+    """ Cleans and formats a scraped french sentence. Returns the new sentence """
 
-    # Replaces <em> tags with bold and underline
-    sentence = re.sub(r"<em>\s*", "<b><u>", sentence)
-    sentence = re.sub(r"(\W*)\s*<\/em>", r"</u></b>\1", sentence)
-    # sentence = re.sub(r"(<\/u><\/b>)(\w+)", r"\1 \2", sentence)
+    # Replace <em> tags with bold and underline
+    frenchSentence = re.sub(r"<em>\s*", "<b><u>", frenchSentence)
+    frenchSentence = re.sub(r"(\W*)\s*<\/em>", r"</u></b>\1", frenchSentence)
 
-    # Removes extra whitespace
-    sentence = sentence.replace("  ", " ")
+    # Remove extra whitespace
+    frenchSentence = frenchSentence.replace("  ", " ")
+
+    # Add full stop if necessary
+    frenchSentence = re.sub(r"(\w+)\s*\Z", r"\1.", frenchSentence)
+    frenchSentence = re.sub(r"(<\/u><\/b>)\s*\Z", r"\1.", frenchSentence)
+
+    return frenchSentence.strip()
+
+
+def format_portuguese_sentence(portuguesesSentence):
+    """ Cleans and formats a scraped portuguese sentence. Returns the new sentence """
+
+    # Remove <a> tags and extra whitespace
+    portuguesesSentence = re.sub(r"\s\s+", " ", portuguesesSentence)
+    portuguesesSentence = re.sub(
+        """<a class="link_highlighted".*<em>""", "<b><u>", portuguesesSentence
+    )
+    portuguesesSentence = portuguesesSentence.replace("</a>", "")
+    # portuguesesSentence = portuguesesSentence.replace("</em>", "</u></b>")
+
+    # Replace <strong> tags with bold and underline
+    portuguesesSentence = re.sub(r"<strong>\s*", "<b><u>", portuguesesSentence)
+    portuguesesSentence = re.sub(
+        r"(\W*)\s*<\/strong>", r"</u></b>\1", portuguesesSentence
+    )
+    portuguesesSentence = re.sub(r"(<\/u><\/b>)(\w+)", r"\1 \2", portuguesesSentence)
 
     # Adds full stop if necessary
-    sentence = re.sub(r"(\w+)\s*\Z", r"\1.", sentence)
-    sentence = re.sub(r"(<\/u><\/b>)\s*\Z", r"\1.", sentence)
+    portuguesesSentence = re.sub(r"(\w+)\s*\Z", r"\1.", portuguesesSentence)
+    portuguesesSentence = re.sub(r"(<\/u><\/b>)\s*\Z", r"\1.", portuguesesSentence)
 
-    return sentence.strip()
-
-
-def format_portuguese_sentence(sentence):
-    """ Cleans a portuguese sentence. Returns the new sentence """
-
-    # Removes <a> tags and extra whitespace
-    sentence = re.sub(r"\s\s+", " ", sentence)
-    sentence = re.sub("""<a class="link_highlighted".*<em>""", "<b><u>", sentence)
-    sentence = sentence.replace("</em>", "</u></b>")
-    sentence = sentence.replace("</a>", "")
-    # print(sentence)
-
-    # Replaces <strong> tags with bold and underline
-    sentence = re.sub(r"<strong>\s*", "<b><u>", sentence)
-    sentence = re.sub(r"(\W*)\s*<\/strong>", r"</u></b>\1", sentence)
-    sentence = re.sub(r"(<\/u><\/b>)(\w+)", r"\1 \2", sentence)
-
-    # Adds full stop if necessary
-    sentence = re.sub(r"(\w+)\s*\Z", r"\1.", sentence)
-    sentence = re.sub(r"(<\/u><\/b>)\s*\Z", r"\1.", sentence)
-
-    return sentence.strip()
+    return portuguesesSentence.strip()
 
 
 def crawl_top(targetURL, ranking=False):
@@ -60,17 +62,18 @@ def crawl_top(targetURL, ranking=False):
         with open(f"crawl_{name}.txt", "w+", encoding="utf-8") as crawl:
             print("Successful GET request!")
 
-            # Extracts the HTML content from the URL for parsing
+            # Extract the HTML content from the URL for parsing
             content = req.content
             html = BeautifulSoup(content, "html.parser")
 
             topListDiv = html.find("div", class_="top_list")
             a = topListDiv.find_all("a")
 
+            # Ex: /index/frances-portugues/w.html
             if ranking:
                 hrefs = [a["href"] for a in a]
-            else:
-                # top lists have 'In Simon we trust' unwanted URL
+            else:  # Ex: /index/frances-portugues/w-1-300.html
+                # top lists have 'In Simon we trust' unwanted URL (???)
                 hrefs = [a["href"] for a in a[:-1]]
 
             for href in hrefs:
@@ -79,37 +82,43 @@ def crawl_top(targetURL, ranking=False):
             return hrefs
 
 
-def scrap_page(targetURL):
+def scrap_page(targetURL, audiosPath, targetLanguage):
     """ Scraps a single URL for sentences and generates audios using WaveNet """
 
+    # Save the word/expression from URL to use as .csv file name
     name = targetURL.split("/")[5][:-1]
     with open(f"csv/{name}.csv", "w+", encoding="utf-8") as card:
-        # Reverso requires user-agent, otherwise will refuse the request
+        # Reverso requires user-agent, otherwise it will refuse the request
         headers = {
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36"
         }
+
         req = requests.get(targetURL, headers=headers)
         if req.status_code == 200:
-            audiosFilenames = list()
             print("Successful GET request!")
 
-            # Extracts the HTML content from the URL for parsing
+            # Initialize lists for later appending
+            audiosFilenames = list()
+            frenchSentences = list()
+            portugueseSentences = list()
+
+            # Extract the HTML content from the URL for parsing
             content = req.content
             html = BeautifulSoup(content, "html.parser")
 
-            # Extracts raw french sentences
+            # Extract raw french sentences
             rawFrench = html.find_all("span", lang="fr")
-            # Extracts raw portuguese sentences
+            # Extract raw portuguese sentences
             rawPortuguese = html.find_all("div", class_="trg ltr")
 
+            # Zip lists so we can sort sentences by target language sentence length
             linkedSentences = zip(rawFrench, rawPortuguese)
+            # Keep only the 6 shortest sentences (they usually have better quality)
             sortedSentences = sorted(
                 linkedSentences, key=lambda elem: len(elem[0].text)
             )[0:6]
 
-            frenchSentences = list()
-            portugueseSentences = list()
-            # Cleaning sentences
+            # Clean sentences
             for frenchElement, portugueseElement in sortedSentences:
                 frenchSentence = format_french_sentence(
                     "".join(map(str, frenchElement.contents))
@@ -120,10 +129,10 @@ def scrap_page(targetURL):
                     "".join(map(str, span.contents))
                 )
 
-                # Long sentences are hardly useful for studying
+                # Long sentences are hardly useful for studying. Remove this if you want them.
                 if len(frenchSentence) > 140 or len(portugueseSentence) > 140:
                     print("Sentence is too long. Skipping it...")
-                    continue  # Skip them
+                    continue
                 else:
                     frenchSentences.append(frenchSentence)
                     portugueseSentences.append(portugueseSentence)
@@ -138,27 +147,38 @@ def scrap_page(targetURL):
                 len(cardInfos)
             ):  # French sentences at index 0, portuguese sentences at index 1
                 # Generate audios for french sentences using Google's WaveNet API
-                # Strip sentences of html tags, otherwise will raise FileNotFoundError exception
+                # Strip sentence of markup so we can use it as filename (otherwise will raise FileNotFoundError exception)
                 cleanSentence = BeautifulSoup(cardInfos[i][0], "lxml").text
-                generate_audio_random("audios/", cleanSentence, "fr-FR")
+                generate_audio_random(audiosPath, cleanSentence, targetLanguage)
                 audiosFilenames.append(get_modified_path(cleanSentence))
 
-                # Write sentences and audios filenames to the .csv file
+                # Write sentences and audios filenames to the .csv file, using TAB as separator
                 card.write(
-                    f"{cardInfos[i][0]}^{cardInfos[i][1]}^[sound:{audiosFilenames[-1]}.mp3]^french_reverso\n"
+                    f"{cardInfos[i][0]}\t{cardInfos[i][1]}\t[sound:{audiosFilenames[-1]}.mp3]\tfrench_reverso\n"
                 )
         else:
             print("Failed GET request.")
 
 
-def scrap_pages_multithread(URLsTxtFile):
+def scrap_pages_multithread(URLsTxtFile, audiosPath, targetLanguage):
+    # Load all URLs to a list
     with open(URLsTxtFile, encoding="utf-8") as file:
         pages = file.readlines()
 
-    with Pool(8) as p:
+    # Lower this if you don't want to use all your CPU threads
+    nThreads = cpu_count()
+    print(f"Running with {nThreads} threads.")
+
+    with Pool(nThreads) as p:
         try:
-            p.map(scrap_page, pages)
-        except KeyboardInterrupt:
+            # Scrap pages synchronously
+            p.map(
+                functools.partial(
+                    scrap_page, audiosPath=audiosPath, targetLanguage=targetLanguage
+                ),
+                pages,
+            )
+        except KeyboardInterrupt:  # Press Ctrl + C to stop execution at any time
             print("Got ^C while pool mapping, terminating the pool")
             p.terminate()
             print("Terminating pool...")
@@ -168,8 +188,9 @@ def scrap_pages_multithread(URLsTxtFile):
 
 
 if __name__ == "__main__":
+    # Where audios should be stored, language to be used for audio generation
     audiosPath = "audios/"
-    language = "fr-FR"
+    targetLanguage = "de-DE"
 
     # Initializing WaveNet's variables
     # Select the type of audio file
@@ -180,14 +201,23 @@ if __name__ == "__main__":
     # Instantiates a TTS client
     client = texttospeech.TextToSpeechClient()
 
-    scrap_pages_multithread("crawled/1-10000/w-1-10000.txt")
+    # Scrap pages listed in .txt file using all CPU threads
+    # scrap_pages_multithread("urls_to_scrape_test.txt", audiosPath, targetLanguage)
 
-    # Testing
-    # with open("target_urls.txt", encoding="utf-8") as file:
+    # Scrap one by one from .txt file
+    # with open("urls_to_scrape_test.txt", encoding="utf-8") as file:
     #     pages = file.readlines()
 
     #     for page in pages:
     #         print(f"Scraping {page}...")
     #         scrap_page(page)
-    # scrap_page("https://context.reverso.net/traducao/frances-portugues/ing%C3%A9rence")
+
+    # Scrap one page only
+    scrap_page(
+        "https://context.reverso.net/traducao/alemao-ingles/ich",
+        audiosPath,
+        targetLanguage,
+    )
+
+    # Crawl top (by frequency)
     # crawl_top("https://context.reverso.net/traducao/index/frances-portugues/w.html", ranking=True)

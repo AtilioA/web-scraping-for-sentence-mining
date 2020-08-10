@@ -72,9 +72,9 @@ def generate_audio_random(path, sentence, language):
     # voice parameters and audio file type
     response = client.synthesize_speech(synthesis_input, voice, audio_config)
 
-    # The response's audio_content is binary.
+    # The response's audio_content is binary
     with open(f"{path}{get_modified_path(sentence)}.mp3", "wb") as out:
-        # Write the response to the output audio file.
+        # Write the response to the output audio file
         out.write(response.audio_content)
         print(
             f'Audio content written to file "{path}{get_modified_path(sentence)}.mp3"'
@@ -82,5 +82,5 @@ def generate_audio_random(path, sentence, language):
 
 
 if __name__ == "__main__":
-    generate_audio_random("", "", "fr-FR")
+    # generate_audio_random(".", "", "fr-FR")
     pass
