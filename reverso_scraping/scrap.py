@@ -7,46 +7,54 @@ from wavenet import generate_audio_random, get_modified_path
 from multiprocessing import Pool, cpu_count
 
 
-def format_french_sentence(frenchSentence):
-    """ Cleans and formats a scraped french sentence. Returns the new sentence """
+def format_target_language_sentence(targetLanguageSentence):
+    """ Cleans and formats a scraped targetLanguageSentence. Returns the new sentence """
 
     # Replace <em> tags with bold and underline
-    frenchSentence = re.sub(r"<em>\s*", "<b><u>", frenchSentence)
-    frenchSentence = re.sub(r"(\W*)\s*<\/em>", r"</u></b>\1", frenchSentence)
+    targetLanguageSentence = re.sub(r"<em>\s*", "<b><u>", targetLanguageSentence)
+    targetLanguageSentence = re.sub(
+        r"(\W*)\s*<\/em>", r"</u></b>\1", targetLanguageSentence
+    )
 
     # Remove extra whitespace
-    frenchSentence = frenchSentence.replace("  ", " ")
+    targetLanguageSentence = targetLanguageSentence.replace("  ", " ")
 
     # Add full stop if necessary
-    frenchSentence = re.sub(r"(\w+)\s*\Z", r"\1.", frenchSentence)
-    frenchSentence = re.sub(r"(<\/u><\/b>)\s*\Z", r"\1.", frenchSentence)
+    targetLanguageSentence = re.sub(r"(\w+)\s*\Z", r"\1.", targetLanguageSentence)
+    targetLanguageSentence = re.sub(
+        r"(<\/u><\/b>)\s*\Z", r"\1.", targetLanguageSentence
+    )
 
-    return frenchSentence.strip()
+    return targetLanguageSentence.strip()
 
 
-def format_portuguese_sentence(portuguesesSentence):
-    """ Cleans and formats a scraped portuguese sentence. Returns the new sentence """
+def format_native_language_sentence(nativeLanguageSentence):
+    """ Cleans and formats a scraped nativeLanguageSentence. Returns the new sentence """
 
     # Remove <a> tags and extra whitespace
-    portuguesesSentence = re.sub(r"\s\s+", " ", portuguesesSentence)
-    portuguesesSentence = re.sub(
-        """<a class="link_highlighted".*<em>""", "<b><u>", portuguesesSentence
+    nativeLanguageSentence = re.sub(r"\s\s+", " ", nativeLanguageSentence)
+    nativeLanguageSentence = re.sub(
+        """<a class="link_highlighted".*<em>""", "<b><u>", nativeLanguageSentence
     )
-    portuguesesSentence = portuguesesSentence.replace("</a>", "")
-    # portuguesesSentence = portuguesesSentence.replace("</em>", "</u></b>")
+    nativeLanguageSentence = nativeLanguageSentence.replace("</a>", "")
+    # nativeLanguageSentence = nativeLanguageSentence.replace("</em>", "</u></b>")
 
     # Replace <strong> tags with bold and underline
-    portuguesesSentence = re.sub(r"<strong>\s*", "<b><u>", portuguesesSentence)
-    portuguesesSentence = re.sub(
-        r"(\W*)\s*<\/strong>", r"</u></b>\1", portuguesesSentence
+    nativeLanguageSentence = re.sub(r"<strong>\s*", "<b><u>", nativeLanguageSentence)
+    nativeLanguageSentence = re.sub(
+        r"(\W*)\s*<\/strong>", r"</u></b>\1", nativeLanguageSentence
     )
-    portuguesesSentence = re.sub(r"(<\/u><\/b>)(\w+)", r"\1 \2", portuguesesSentence)
+    nativeLanguageSentence = re.sub(
+        r"(<\/u><\/b>)(\w+)", r"\1 \2", nativeLanguageSentence
+    )
 
     # Adds full stop if necessary
-    portuguesesSentence = re.sub(r"(\w+)\s*\Z", r"\1.", portuguesesSentence)
-    portuguesesSentence = re.sub(r"(<\/u><\/b>)\s*\Z", r"\1.", portuguesesSentence)
+    nativeLanguageSentence = re.sub(r"(\w+)\s*\Z", r"\1.", nativeLanguageSentence)
+    nativeLanguageSentence = re.sub(
+        r"(<\/u><\/b>)\s*\Z", r"\1.", nativeLanguageSentence
+    )
 
-    return portuguesesSentence.strip()
+    return nativeLanguageSentence.strip()
 
 
 def crawl_top(targetURL, ranking=False):
@@ -99,54 +107,61 @@ def scrap_page(targetURL, audiosPath, targetLanguage):
 
             # Initialize lists for later appending
             audiosFilenames = list()
-            frenchSentences = list()
-            portugueseSentences = list()
+            targetLanguageSentences = list()
+            nativeLanguageSentences = list()
 
             # Extract the HTML content from the URL for parsing
             content = req.content
             html = BeautifulSoup(content, "html.parser")
 
-            # Extract raw french sentences
-            rawFrench = html.find_all("span", lang="fr")
-            # Extract raw portuguese sentences
-            rawPortuguese = html.find_all("div", class_="trg ltr")
+            # Extract raw targetLanguage sentences
+            rawTargetLanguageSentences = html.find_all("span", lang="fr")
+            # Extract raw nativeLanguage sentences
+            rawNativeLanguageSentences = html.find_all("div", class_="trg ltr")
 
             # Zip lists so we can sort sentences by target language sentence length
-            linkedSentences = zip(rawFrench, rawPortuguese)
+            linkedSentences = zip(
+                rawTargetLanguageSentences, rawNativeLanguageSentences
+            )
             # Keep only the 6 shortest sentences (they usually have better quality)
             sortedSentences = sorted(
                 linkedSentences, key=lambda elem: len(elem[0].text)
             )[0:6]
 
             # Clean sentences
-            for frenchElement, portugueseElement in sortedSentences:
-                frenchSentence = format_french_sentence(
-                    "".join(map(str, frenchElement.contents))
+            for targetLanguageElement, nativeLanguageElement in sortedSentences:
+                targetLanguageSentence = format_target_language_sentence(
+                    "".join(map(str, targetLanguageElement.contents))
                 )
 
-                span = portugueseElement.find("span", class_="text")
-                portugueseSentence = format_portuguese_sentence(
-                    "".join(map(str, span.contents))
+                nativeLanguageSpan = nativeLanguageElement.find("span", class_="text")
+                nativeLanguageSentence = format_native_language_sentence(
+                    "".join(map(str, nativeLanguageSpan.contents))
                 )
 
                 # Long sentences are hardly useful for studying. Remove this if you want them.
-                if len(frenchSentence) > 140 or len(portugueseSentence) > 140:
+                if (
+                    len(targetLanguageSentence) > 140
+                    or len(nativeLanguageSentence) > 140
+                ):
                     print("Sentence is too long. Skipping it...")
                     continue
                 else:
-                    frenchSentences.append(frenchSentence)
-                    portugueseSentences.append(portugueseSentence)
+                    targetLanguageSentences.append(targetLanguageSentence)
+                    nativeLanguageSentences.append(nativeLanguageSentence)
 
-            if len(frenchSentences) != len(portugueseSentences):  # If parsing fails
+            if len(targetLanguageSentences) != len(
+                nativeLanguageSentences
+            ):  # If parsing fails
                 print(
-                    f"Lists don't have all the same length. Output may be compromised.\n{len(frenchSentences)}, {len(portugueseSentences)}"
+                    f"Lists don't have all the same length. Output may be compromised.\n{len(targetLanguageSentences)}, {len(nativeLanguageSentences)}"
                 )
 
-            cardInfos = list(zip(frenchSentences, portugueseSentences))
+            cardInfos = list(zip(targetLanguageSentences, nativeLanguageSentences))
             for i in range(
                 len(cardInfos)
-            ):  # French sentences at index 0, portuguese sentences at index 1
-                # Generate audios for french sentences using Google's WaveNet API
+            ):  # targetLanguage sentences at index 0, nativeLanguage sentences at index 1
+                # Generate audios for targetLanguage sentences using Google's WaveNet API
                 # Strip sentence of markup so we can use it as filename (otherwise will raise FileNotFoundError exception)
                 cleanSentence = BeautifulSoup(cardInfos[i][0], "lxml").text
                 generate_audio_random(audiosPath, cleanSentence, targetLanguage)
@@ -154,7 +169,7 @@ def scrap_page(targetURL, audiosPath, targetLanguage):
 
                 # Write sentences and audios filenames to the .csv file, using TAB as separator
                 card.write(
-                    f"{cardInfos[i][0]}\t{cardInfos[i][1]}\t[sound:{audiosFilenames[-1]}.mp3]\tfrench_reverso\n"
+                    f"{cardInfos[i][0]}\t{cardInfos[i][1]}\t[sound:{audiosFilenames[-1]}.mp3]\ttargetLanguage_reverso\n"
                 )
         else:
             print("Failed GET request.")
@@ -190,7 +205,7 @@ def scrap_pages_multithread(URLsTxtFile, audiosPath, targetLanguage):
 if __name__ == "__main__":
     # Where audios should be stored, language to be used for audio generation
     audiosPath = "audios/"
-    targetLanguage = "de-DE"
+    targetLanguage = "fr-FR"
 
     # Initializing WaveNet's variables
     # Select the type of audio file
@@ -214,7 +229,7 @@ if __name__ == "__main__":
 
     # Scrap one page only
     scrap_page(
-        "https://context.reverso.net/traducao/alemao-ingles/ich",
+        "https://context.reverso.net/traducao/frances-portugues/fichier",
         audiosPath,
         targetLanguage,
     )
