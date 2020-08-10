@@ -1,4 +1,5 @@
 import re
+import urllib.parse
 import functools
 import requests
 from bs4 import BeautifulSoup
@@ -60,6 +61,7 @@ def format_native_language_sentence(nativeLanguageSentence):
 def crawl_top(targetURL, ranking=False):
     """ Crawls top list or ranking page looking for links to target words/expressions """
 
+    # Reverso requires user-agent, otherwise it will refuse the request
     headers = {
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36"
     }
@@ -94,7 +96,7 @@ def scrap_page(targetURL, audiosPath, targetLanguage):
     """ Scraps a single URL for sentences and generates audios using WaveNet """
 
     # Save the word/expression from URL to use as .csv file name
-    name = targetURL.split("/")[5][:-1]
+    name = urllib.parse.unquote(targetURL.split("/")[5])  # [:-1]
     with open(f"csv/{name}.csv", "w+", encoding="utf-8") as card:
         # Reverso requires user-agent, otherwise it will refuse the request
         headers = {
@@ -115,7 +117,9 @@ def scrap_page(targetURL, audiosPath, targetLanguage):
             html = BeautifulSoup(content, "html.parser")
 
             # Extract raw targetLanguage sentences
-            rawTargetLanguageSentences = html.find_all("span", lang="fr")
+            rawTargetLanguageSentences = html.find_all(
+                "span", lang=targetLanguage[:2].lower()
+            )
             # Extract raw nativeLanguage sentences
             rawNativeLanguageSentences = html.find_all("div", class_="trg ltr")
 
@@ -217,10 +221,12 @@ if __name__ == "__main__":
     client = texttospeech.TextToSpeechClient()
 
     # Scrap pages listed in .txt file using all CPU threads
-    # scrap_pages_multithread("urls_to_scrape_test.txt", audiosPath, targetLanguage)
+    scrap_pages_multithread("urls_to_scrape'_example.'txt", audiosPath, targetLanguage)
+    print("Done scraping URLs from .txt file.")
 
+    # Examples: (remove the # to uncomment)
     # Scrap one by one from .txt file
-    # with open("urls_to_scrape_test.txt", encoding="utf-8") as file:
+    # with open("urls_to_scrape_example.txt", encoding="utf-8") as file:
     #     pages = file.readlines()
 
     #     for page in pages:
@@ -228,11 +234,12 @@ if __name__ == "__main__":
     #         scrap_page(page)
 
     # Scrap one page only
+    targetLanguage = "de-DE"
     scrap_page(
-        "https://context.reverso.net/traducao/frances-portugues/fichier",
+        "https://context.reverso.net/translation/german-english/ich",
         audiosPath,
         targetLanguage,
     )
 
-    # Crawl top (by frequency)
+    # Crawl "top" (frequency) page
     # crawl_top("https://context.reverso.net/traducao/index/frances-portugues/w.html", ranking=True)

@@ -116,3 +116,4 @@ make_audiobook.py
 scraping/
 
 !requirements.txt
+!urls_to_scrape_example.txt
