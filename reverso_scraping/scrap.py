@@ -83,7 +83,7 @@ def crawl_top(targetURL, ranking=False):
             if ranking:
                 hrefs = [a["href"] for a in a]
             else:  # Ex: /index/frances-portugues/w-1-300.html
-                # top lists have 'In Simon we trust' unwanted URL (???)
+                # top lists have 'In Simon we trust' unwanted URL (easter egg?)
                 hrefs = [a["href"] for a in a[:-1]]
 
             for href in hrefs:
@@ -220,9 +220,12 @@ if __name__ == "__main__":
     # Instantiates a TTS client
     client = texttospeech.TextToSpeechClient()
 
+    # Crawl "top" (frequency) page
+    # crawl_top("https://context.reverso.net/traducao/index/frances-portugues/w.html", ranking=True)
+
     # Scrap pages listed in .txt file using all CPU threads
-    scrap_pages_multithread("urls_to_scrape'_example.'txt", audiosPath, targetLanguage)
-    print("Done scraping URLs from .txt file.")
+    # scrap_pages_multithread("urls_to_scrape'_example.'txt", audiosPath, targetLanguage)
+    # print("Done scraping URLs from .txt file.")
 
     # Examples: (remove the # to uncomment)
     # Scrap one by one from .txt file
@@ -234,12 +237,9 @@ if __name__ == "__main__":
     #         scrap_page(page)
 
     # Scrap one page only
-    targetLanguage = "de-DE"
+    targetLanguage = "fr-FR"
     scrap_page(
-        "https://context.reverso.net/translation/german-english/ich",
+        "https://context.reverso.net/translation/french-english/oui",
         audiosPath,
         targetLanguage,
     )
-
-    # Crawl "top" (frequency) page
-    # crawl_top("https://context.reverso.net/traducao/index/frances-portugues/w.html", ranking=True)
