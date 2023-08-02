@@ -2,8 +2,8 @@ import os
 import requests
 import json
 
-os.environ["GOOGLE_API_KEY"] = "AIzaSyASzZGH0aVypv3tOhSKULONQlgqlhyFJSg"
-os.environ["FRENCH_SEARCH_ENGINE_ID"] = "631540dcbd0c54186"
+os.environ["GOOGLE_API_KEY"] = # Insert your API key here
+os.environ["FRENCH_SEARCH_ENGINE_ID"] = # Insert your search engine ID here
 
 def google_search(search_term):
     # Get API key and search engine ID from environment variables
