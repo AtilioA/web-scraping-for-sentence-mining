@@ -1,3 +1,8 @@
+import time
+import json
+import os
+import glob
+import csv
 import urllib.parse
 import functools
 import requests
@@ -6,9 +11,18 @@ from google.cloud import texttospeech
 from wavenet import generate_audio_random, get_modified_path
 from multiprocessing import Pool, cpu_count
 
-from str_utils import format_target_language_sentence, format_native_language_sentence
+from str_utils import format_target_language_sentence, format_native_language_sentence, create_prompt
 from crawl import crawl_top, crawl_all
+from custom_search import get_total_results
+from utils import sort_json_file
+from dotenv import load_dotenv
+import openai
 
+# Load .env file
+load_dotenv()
+
+# Get the API key
+openai.api_key = os.getenv('OPENAI_APIKEY')
 
 def scrap_page(targetURL, audiosPath, targetLanguage):
     """ Scraps a single URL for sentences and generates audios using WaveNet """
@@ -124,42 +138,162 @@ def scrap_pages_multithread(URLsTxtFile, audiosPath, targetLanguage):
             print("Done!")
 
 
+def process_expressions():
+    # Load sorted expressions
+    with open('frequency_marked_wikt_filtered.json', 'r', encoding='utf8') as f:
+        expressions = json.load(f)
+
+    # If the generated_prompts.json file does not exist or is empty, initialize an empty dictionary
+    if not os.path.exists("generated_prompts.json") or os.path.getsize("generated_prompts.json") == 0:
+        generated_prompts = {}
+    else:
+        with open("generated_prompts.json", "r", encoding='utf8') as file:
+            generated_prompts = json.load(file)
+
+    # Loop over each expression
+    for expression in expressions.keys():
+        # Check if this expression is already generated or if its key exists in the generated_prompts
+        if ("generated" in expressions[expression] and expressions[expression]["generated"]) or expression in generated_prompts:
+            continue
+
+        # Create the prompt
+        prompt = create_prompt(expression)
+
+        # Attempt to generate the prompt
+        try:
+            chat_completion = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}], max_tokens=220, temperature=0.8).choices[0].message.content
+            print(chat_completion)
+            generated_prompt = json.loads(chat_completion)
+
+            # Save the generated prompt to the dictionary
+            generated_prompts[expression] = generated_prompt[expression]
+
+            # Mark this expression as generated
+            expressions[expression]["generated"] = True
+            print(f"Generated prompt for {expression}")
+        except Exception as e:
+            print(f"Failed to generate prompt for {expression} due to {str(e)}")
+            expressions[expression]["generated"] = False
+
+        # Save the updated expressions and generated prompts to files
+        with open('frequency_marked_wikt_filtered.json', 'w', encoding='utf8') as f:
+            json.dump(expressions, f, ensure_ascii=False, indent=4)
+        with open('generated_prompts.json', 'w', encoding='utf8') as f:
+            json.dump(generated_prompts, f, ensure_ascii=False, indent=4)
+
+
+def csv_to_json():
+    results = {}
+
+    # If the all_phrases.json file does not exist or is empty, initialize an empty dictionary
+    if not os.path.exists("all_phrases.json") or os.path.getsize("all_phrases.json") == 0:
+        results = {}
+    else:
+        with open("all_phrases.json", "r", encoding='utf8') as file:
+            results = json.load(file)
+
+    # Iterate over all csv files
+    for csv_file in glob.glob("crawled/csv/*.csv"):
+        with open(csv_file, newline='', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            next(reader)  # Skip the header
+            for row in reader:
+                phrase = row[0]
+                # Only process phrases that haven't been processed yet
+                if phrase not in results:
+                    # Set frequency as None as placeholder. Replace it with the actual function to calculate frequency if available.
+                    # Set present_in_wiktionnaire as None as placeholder. Replace it with the actual function to check presence in Wiktionary if available.
+                    results[phrase] = {"frequency": None, "present_in_wiktionnaire": None}
+
+    # Save results after processing all phrases
+    with open("all_phrases.json", "w", encoding='utf8') as file:
+        json.dump(results, file, ensure_ascii=False)
+
+def process_phrases():
+    results = {}
+    # If the frequency.json file does not exist or is empty, initialize an empty dictionary
+    if not os.path.exists("frequency.json") or os.path.getsize("frequency.json") == 0:
+        results = {}
+    else:
+        with open("frequency.json", "r", encoding='utf8') as file:
+            results = json.load(file)
+
+    # iterate over all csv files
+    for csv_file in glob.glob("crawled/csv/*.csv"):
+        with open(csv_file, newline='', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            next(reader)  # Skip the header
+            for row in reader:
+                phrase = row[0]
+                # only process phrases that haven't been processed yet
+                if phrase not in results:
+                    # wait 3 seconds to avoid getting blocked by Google (429 error)
+                    time.sleep(3)
+                    results[phrase] = get_total_results(phrase)
+                    # save results after processing each phrase
+                    with open("frequency.json", "w", encoding='utf8') as file:
+                        json.dump(results, file, ensure_ascii=False)
+
+
 if __name__ == "__main__":
-    # Where audios should be stored, language to be used for audio generation
-    audiosPath = "audios/"
-    targetLanguage = "fr-FR"
+    openai.api_key = os.getenv('OPENAI_APIKEY')
+    # phrases = ["dans le pétrin"]
+    # prompt = create_prompt(phrases)
+    # print(prompt)
 
-    # Initializing WaveNet's variables
-    # Select the type of audio file
-    audio_config = texttospeech.AudioConfig(
-        audio_encoding=texttospeech.AudioEncoding.LINEAR16
-    )
+    process_expressions()
+    # csv_to_json()
 
-    # Instantiates a TTS client
-    client = texttospeech.TextToSpeechClient()
 
-    # Crawl "top" (frequency) page
-    # crawl_top("https://context.reverso.net/traducao/index/frances-portugues/p.html", ranking=True)
-    # crawl_top("https://context.reverso.net/traducao/index/frances-portugues/p-401-800.html", onlyNames=True, ranking=False)
-    crawl_all()
+    # create a chat completion
+    # chat_completion = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": create_prompt(phrases)}], max_tokens=284)
 
-    # Scrap pages listed in .txt file using all CPU threads
-    # scrap_pages_multithread("urls_to_scrape'_example.'txt", audiosPath, targetLanguage)
-    # print("Done scraping URLs from .txt file.")
+    # # print the chat completion
+    # print(chat_completion.choices[0].message.content)
 
-    # Examples: (remove the # to uncomment)
-    # Scrap one by one from .txt file
-    # with open("urls_to_scrape_example.txt", encoding="utf-8") as file:
-    #     pages = file.readlines()
 
-    #     for page in pages:
-    #         print(f"Scraping {page}...")
-    #         scrap_page(page)
+    # Process all phrases
+    # process_phrases()
+    # sort_json_file("frequency.json")
 
-    # Scrap one page only
-    # targetLanguage = "fr-FR"
-    # scrap_page(
-    #     "https://context.reverso.net/translation/french-english/oui",
-    #     audiosPath,
-    #     targetLanguage,
-    # )
+
+
+# if __name__ == "__main__":
+#     # Where audios should be stored, language to be used for audio generation
+#     audiosPath = "audios/"
+#     targetLanguage = "fr-FR"
+
+#     # Initializing WaveNet's variables
+#     # Select the type of audio file
+#     audio_config = texttospeech.AudioConfig(
+#         audio_encoding=texttospeech.AudioEncoding.LINEAR16
+#     )
+
+#     # Instantiates a TTS client
+#     client = texttospeech.TextToSpeechClient()
+
+#     # Crawl "top" (frequency) page
+#     # crawl_top("https://context.reverso.net/traducao/index/frances-portugues/p.html", ranking=True)
+#     # crawl_top("https://context.reverso.net/traducao/index/frances-portugues/p-401-800.html", onlyNames=True, ranking=False)
+#     crawl_all()
+
+#     # Scrap pages listed in .txt file using all CPU threads
+#     # scrap_pages_multithread("urls_to_scrape'_example.'txt", audiosPath, targetLanguage)
+#     # print("Done scraping URLs from .txt file.")
+
+#     # Examples: (remove the # to uncomment)
+#     # Scrap one by one from .txt file
+#     # with open("urls_to_scrape_example.txt", encoding="utf-8") as file:
+#     #     pages = file.readlines()
+
+#     #     for page in pages:
+#     #         print(f"Scraping {page}...")
+#     #         scrap_page(page)
+
+#     # Scrap one page only
+#     # targetLanguage = "fr-FR"
+#     # scrap_page(
+#     #     "https://context.reverso.net/translation/french-english/oui",
+#     #     audiosPath,
+#     #     targetLanguage,
+#     # )

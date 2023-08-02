@@ -2,7 +2,7 @@ import os
 import random
 from google.cloud import texttospeech
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "api_key.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/home/atilioa/Documents/AnkiCards/web-scraping-for-sentence-mining/reverso_scraping/api_key.json"
 
 
 # Select the type of audio file

@@ -48,3 +48,19 @@ def format_native_language_sentence(nativeLanguageSentence):
     )
 
     return nativeLanguageSentence.strip()
+
+def create_prompt(phrases):
+    # Start of the prompt
+    prompt = "Come up with two different sentences in French for each expression in the following list, and provide a explanation using only French (monolingual translation/definition); feel free to add HTML tags such as <b>, <i>, <u> whenever appropriate, while warning about potential misuses if applicable. Also provide equivalent expressions (not full sentences) in PT_BR and EN_US:\n"
+
+    # Add each phrase to the prompt
+    if type(phrases) == list:
+        for phrase in phrases:
+            prompt += phrase + "\n"
+    else:
+        prompt += phrases + "\n"
+
+    # End of the prompt
+    prompt += "\nAnswer in a single valid JSON of this format: {expressionName: { sentences: [], explanation: \"\", english_equivalent: [""], portuguese_equivalent: [""]}. Add more sentences in the same JSON entry if the expression has more than two meanings."
+
+    return prompt
